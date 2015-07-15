@@ -1,5 +1,6 @@
 angular
   .module('treeMapApp', [
     'templates',
-    'treeMap'
+    'treeMap',
+    'globalEvents'
   ]);

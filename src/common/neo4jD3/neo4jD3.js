@@ -53,7 +53,8 @@ function neo4jD3Converter (results) {
     nodes[currentParentName].children.push(nodes[currentChildName]);
   }
 
-  return nodes['owl:Thing'];
+  // Deep clone object to be usable by D3
+  return JSON.parse(JSON.stringify(nodes['owl:Thing']));
 }
 
 function Neo4jD3 ($q, Neo4J, settings) {
