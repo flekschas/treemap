@@ -1,0 +1,21 @@
+{
+  "name": "treemap",
+  "version": "0.0.1",
+  "description": "Treemap Prototype",
+  "author": "Fritz Lekschas",
+  "license": "MIT",
+  "devDependencies": {
+    "gulp": "^3.9.0",
+    "gulp-angular-templatecache": "^1.7.0",
+    "gulp-changed": "^1.2.1",
+    "gulp-clean": "^0.3.1",
+    "gulp-concat": "^2.6.0",
+    "gulp-plumber": "^1.0.1",
+    "gulp-rename": "^1.2.2",
+    "gulp-sass": "^2.0.3",
+    "gulp-webserver": "^0.9.1",
+    "gulp-wrap": "^0.11.0",
+    "opn": "^3.0.2",
+    "run-sequence": "^1.1.1"
+  }
+}
