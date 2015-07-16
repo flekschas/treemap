@@ -4,7 +4,6 @@
   right: 1em;
   bottom: 1em;
   left: 1em;
-  background: #fff;
 }
 
 #treeMap .node {
@@ -49,12 +48,13 @@
 
 #treeMap rect {
   fill: none;
-  stroke: #fff;
+  stroke: #e5e5e5;
+  stroke-width: 0.5%;
 }
 
 #treeMap rect.parent,
 #treeMap .grandparent rect {
-  stroke-width: 2px;
+  stroke-width: 1%;
 }
 
 #treeMap .children rect.parent,
@@ -63,12 +63,22 @@
 }
 
 #treeMap .children rect.parent {
-  fill: #bbb;
-  fill-opacity: .5;
+  fill: #ccc;
+  fill-opacity: 0.5;
 }
 
-#treeMap .children:hover rect.child {
-  fill: #bbb;
+#treeMap .children:hover rect.parent {
+  fill: #808080;
+}
+
+#treeMap .children rect.child {
+  fill: #ccc;
+}
+
+#treeMap .children text {
+  font-size: 0.625em;
+  line-height: 1.2em;
+  transform: translate3d(3px, 3px, 0);
 }
 
 #treeMap .depth {
