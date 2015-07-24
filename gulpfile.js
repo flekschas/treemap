@@ -1,15 +1,26 @@
-var gulp          = require('gulp');
-var plumber       = require('gulp-plumber');
-var sass          = require('gulp-sass');
-var webserver     = require('gulp-webserver');
-var opn           = require('opn');
-var concat        = require('gulp-concat');
-var spawn         = require('child_process').spawn;
-var wrap          = require('gulp-wrap');
-var rename        = require("gulp-rename");
 var clean         = require('gulp-clean');
+var concat        = require('gulp-concat');
+var gulp          = require('gulp');
+var gulpUtil      = require('gulp-util');
+var opn           = require('opn');
+var plumber       = require('gulp-plumber');
+var rename        = require("gulp-rename");
 var runSequence   = require('run-sequence');
+var sass          = require('gulp-sass');
+var spawn         = require('child_process').spawn;
 var templateCache = require('gulp-angular-templatecache');
+var webserver     = require('gulp-webserver');
+var wrap          = require('gulp-wrap');
+
+
+/*
+ * -----------------------------------------------------------------------------
+ * Config
+ * -----------------------------------------------------------------------------
+ */
+
+var openBrowser   = gulpUtil.env.open;
+
 
 /*
  * -----------------------------------------------------------------------------
@@ -45,6 +56,7 @@ var server = {
   host: 'localhost',
   port: '8001'
 };
+
 
 /*
  * -----------------------------------------------------------------------------
@@ -116,8 +128,10 @@ gulp.task('webserver', function() {
     }));
 });
 
-gulp.task('openBrowser', function() {
-  opn('http://' + server.host + ':' + server.port + '/dist');
+gulp.task('open', function() {
+  if (openBrowser) {
+    opn('http://' + server.host + ':' + server.port + '/dist');
+  }
 });
 
 /*
@@ -146,4 +160,4 @@ gulp.task('build', function(callback) {
     callback);
 });
 
-gulp.task('default', ['build', 'webserver', 'watch', 'openBrowser']);
+gulp.task('default', ['build', 'webserver', 'watch', 'open']);

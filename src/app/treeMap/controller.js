@@ -43,17 +43,10 @@ function TreeMapCtrl ($element, $, d3, neo4jD3) {
 
   neo4jD3.d3
     .then(function (data) {
-      this.data = {
-        name: 'owl:Thing',
-        children: data.children[0].children
-      };
+      this.data = data;
       this.init();
     }.bind(this));
 }
-
-TreeMapCtrl.prototype.xinit = function () {
-
-};
 
 TreeMapCtrl.prototype.init = function () {
   if (this.data === null) {
@@ -63,7 +56,8 @@ TreeMapCtrl.prototype.init = function () {
   var that = this;
 
   initialize.call(this, this.data);
-  accumulateByCount.call(this, this.data);
+  accumulate_and_prune.call(this, this.data);
+  // accumulateByCount.call(this, this.data);
   layout.call(this, this.data);
   display.call(this, this.data);
 
@@ -74,6 +68,73 @@ TreeMapCtrl.prototype.init = function () {
     root.dx = this.d3.width;
     root.dy = this.d3.height;
     root.depth = 0;
+  }
+
+  /**
+   * Starter function for aggrgation and pruning.
+   * @param  {object} data D3 tree object.
+   */
+  function accumulate_and_prune(data) {
+    var numChildren = data.children ? data.children.length : false;
+    if (numChildren) {
+      accumulate_and_prune_children(data, numChildren);
+      if (data.value) {
+        data.value += data.numDataSets;
+      } else {
+        data.value = data.numDataSets;
+      }
+    }
+  }
+
+  /**
+   * Aggregate `numDataSets` values and prune _empty_ leafes. This function
+   * traverses all inner loops and stops one level BEFORE a leaf to be able to
+   * splice (delete) empty leafs from the list of children
+   * @param  {[type]} data        [description]
+   * @param  {[type]} numChildren [description]
+   * @return {[type]}             [description]
+   */
+  function accumulate_and_prune_children(node, numChildren) {
+    // A reference for later
+    node._children = node.children;
+    var i = numChildren;
+    // We move in reverse order so that deleting nodes doesn't affect future
+    // indices.
+    while (i--) {
+      var child = node.children[i];
+      numChildren = child.children ? child.children.length : false;
+      if (numChildren) {
+        // Inner node.
+        accumulate_and_prune_children(child, numChildren);
+        numChildren = child.children.length;
+      }
+
+      // We ask again for the number of children since it can happen that all
+      // children have been deleted meanwhile and the inner node became a leaf
+      // as well.
+      if (numChildren) {
+        // Inner node.
+        // Add own `numDataSets` to existing `value`.
+        child.value += child.numDataSets;
+      } else {
+        // Leaf.
+        if (child.numDataSets === 0) {
+          // Leaf was not used for annotation so we remove it.
+          node.children.splice(i, 1);
+          continue;
+        } else {
+          // Also set `value` of the children itself.
+          child.value = child.numDataSets;
+        }
+      }
+
+      // Increase `value` if the node by the children's `numDataSets`.
+      if (typeof node.value !== 'undefined') {
+        node.value += child.value;
+      } else {
+        node.value = child.value;
+      }
+    }
   }
 
   // Aggregate the values for internal nodes. This is normally done by the

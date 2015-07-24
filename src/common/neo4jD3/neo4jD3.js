@@ -1,8 +1,16 @@
-function neo4jD3Converter (results) {
+function buildTree (results) {
   var child,
-      currentChildName,
-      currentParentName,
+      // Stores the children of each node..
+      // The only difference to `nodes` is that the `children` is an object
+      // holding the name of the child node.
+      childIndex = {
+        'owl:Thing': {}
+      },
+      currentChild,
+      currentDataSet,
+      currentParent,
       data = results.data,
+      dataSet,
       i,
       lastNode,
       len,
@@ -19,11 +27,14 @@ function neo4jD3Converter (results) {
   len = results.columns.length;
   for (i = 0; i < len; i++) {
     switch (results.columns[i]) {
-      case 'parent':
-        parent = i;
-        break;
       case 'child':
         child = i;
+        break;
+      case 'dataSet':
+        dataSet = i;
+        break;
+      case 'parent':
+        parent = i;
         break;
     }
   }
@@ -31,30 +42,59 @@ function neo4jD3Converter (results) {
   // Loop over all rows and build the tree
   len = data.length;
   for (i = 0; i < len; i++) {
-    // Cache for speed
+    // Cache for speed:
     // Extensive object nesting is expensive;
-    currentChildName = data[i].row[child].name;
-    currentParentName = data[i].row[parent].name;
+    currentChild = data[i].row[child];
+    currentDataSet = data[i].row[dataSet];
+    currentParent = data[i].row[parent];
 
-    if (!(currentParentName in nodes)) {
-      nodes[currentParentName] = {
-        name: currentParentName,
-        children: []
+    if (!(currentParent.name in nodes)) {
+      nodes[currentParent.name] = {
+        children: [],
+        dataSets: [],
+        name: currentParent.name,
+        numDataSets: 0,
+        ontID: currentParent.name
       };
     }
 
-    if (!(currentChildName in nodes)) {
-      nodes[currentChildName] = {
-        name: currentChildName,
-        children: []
+    if (!(currentChild.name in nodes)) {
+      nodes[currentChild.name] = {
+        children: [],
+        dataSets: [],
+        name: currentChild.name,
+        numDataSets: 0,
+        ontID: currentChild.name
       };
     }
 
-    nodes[currentParentName].children.push(nodes[currentChildName]);
+    if ('rdfs:label' in currentChild) {
+      nodes[currentChild.name].name = currentChild['rdfs:label'];
+    }
+
+    if ('uri' in currentChild) {
+      nodes[currentChild.name].uri = currentChild.uri;
+    }
+
+    if (currentDataSet !== null) {
+      nodes[currentChild.name].numDataSets++;
+      nodes[currentChild.name].dataSets.push(currentDataSet.uuid);
+    }
+
+    if (!(currentParent.name in childIndex)) {
+      childIndex[currentParent.name] = {};
+    }
+
+    if (!(currentChild.name in childIndex[currentParent.name])) {
+      nodes[currentParent.name].children.push(nodes[currentChild.name]);
+      childIndex[currentParent.name][currentChild.name] = true;
+    }
   }
 
   // Deep clone object to be usable by D3
-  return JSON.parse(JSON.stringify(nodes['owl:Thing']));
+  var tmp = JSON.parse(JSON.stringify(nodes['owl:Thing']));
+  console.log(tmp);
+  return tmp;
 }
 
 function Neo4jD3 ($q, Neo4J, settings) {
@@ -69,7 +109,9 @@ function Neo4jD3 ($q, Neo4J, settings) {
 
   this.Neo4J.query({
       statements: [{
-        statement: "MATCH (parent:Class)<-[:`rdfs:subClassOf`]-(child) RETURN parent, child"
+        statement: "MATCH (parent:cl:Class)<-[:`rdfs:subClassOf`]-(child) " +
+          "OPTIONAL MATCH (dataSet:DataSet)-[:`annotated_with`]->(child) " +
+          "RETURN parent, child, dataSet"
       }]
     })
     .$promise
@@ -77,7 +119,7 @@ function Neo4jD3 ($q, Neo4J, settings) {
       if (response.errors.length === 0) {
         try {
           var start = new Date().getTime();
-          var d3Data = neo4jD3Converter(response.results[0]);
+          var d3Data = buildTree(response.results[0]);
           d3Deferred.resolve(d3Data);
           var end = new Date().getTime();
           var time = end - start;

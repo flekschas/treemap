@@ -1,6 +1,6 @@
 {
   "name": "treemap",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Treemap Prototype",
   "author": "Fritz Lekschas",
   "license": "MIT",
@@ -13,6 +13,7 @@
     "gulp-plumber": "^1.0.1",
     "gulp-rename": "^1.2.2",
     "gulp-sass": "^2.0.3",
+    "gulp-util": "^3.0.6",
     "gulp-webserver": "^0.9.1",
     "gulp-wrap": "^0.11.0",
     "opn": "^3.0.2",
