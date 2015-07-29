@@ -145,7 +145,7 @@ gulp.task('watch', function() {
   gulp.watch([
       globalPaths.src + '/app/**/*.html',
       globalPaths.src + '/common/**/*.html',
-    ], ['template']);
+    ], ['templates']);
   gulp.watch(globalPaths.src + sourcePaths.styles + '/**/*.scss', ['sass']);
   gulp.watch(globalPaths.src + '/**/*.js', ['jsSource']);
   gulp.watch(vendorPaths, ['jsVendor']);
