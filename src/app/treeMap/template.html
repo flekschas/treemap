@@ -1,1 +1,12 @@
-<div id="treeMap"></div>
+<div class="treeMapWrapper">
+  <div class="top-bar">
+    <p>
+    Browse by <button ng-class="{'active': treeMap.mode === 'branch'}" ng-click="treeMap.browseMode('branch')">branch</button> or <button ng-class="{'active': treeMap.mode === 'level'}" ng-click="treeMap.browseMode('level')">level</button>
+    </p>
+    <p>
+      No levels:
+      <input type="number" ng-model="treeMap.numLevels">
+    </p>
+  </div>
+  <div class="treeMap"></div>
+</div>
