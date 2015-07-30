@@ -1,8 +1,10 @@
+/* global angular:false */
+
 function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
   this.$ = $;
   this.d3 = d3;
   this.$element = this.$($element),
-  this.$d3Element = this.$element.find('.treeMap');
+  this.$d3Element = this.$element.find('.treeMap svg');
 
   this._numLevels = 3;
 
@@ -19,8 +21,6 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
     .domain([0, this.d3.width])
     .range([0, this.d3.width]);
 
-  console.log(this.d3.x(2 * this.d3.width), 2 * this.d3.width);
-
   this.d3.y = this.d3.scale.linear()
     .domain([0, this.d3.height])
     .range([0, this.d3.height]);
@@ -31,24 +31,25 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
     .ratio(this.d3.height / this.d3.width * 0.5 * (1 + Math.sqrt(5)))
     .round(false);
 
-  this.d3.element = this.d3.select(this.$d3Element[0]).append('svg')
-    .attr('class', 'd3')
+  this.d3.element = this.d3.select(this.$d3Element[0])
     .attr('viewBox', '0 0 ' + this.d3.width + ' ' + this.d3.height)
-    .append("g")
-      .style("shape-rendering", "crispEdges");
+    .append('g')
+      .style('shape-rendering', 'crispEdges');
 
-  this.d3.grandparent = this.d3.element.append("g")
-    .attr("class", "grandparent");
+  this.d3.grandparent = this.d3.element.append('g')
+    .attr('class', 'grandparent');
 
-  this.d3.grandparent.append("rect")
-    .attr("y", 0)
-    .attr("width", this.d3.width)
-    .attr("height", 0);
+  this.d3.grandparent.append('rect')
+    .attr('y', 0)
+    .attr('width', this.d3.width)
+    .attr('height', 0);
 
-  this.d3.grandparent.append("text")
-    .attr("x", 6)
-    .attr("y", 6)
-    .attr("dy", ".75em");
+  this.d3.grandparent.append('text')
+    .attr('x', 6)
+    .attr('y', 6)
+    .attr('dy', '.75em');
+
+  this.counter = 0;
 
   neo4jD3.d3
     .then(function (data) {
@@ -72,8 +73,9 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
 TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
   var numChildren = data.children ? data.children.length : false;
   data.meta = data.meta || {};
+
   if (numChildren) {
-    accumulateAndPruneChildren(data, numChildren, valueProp, 0, true);
+    accumulateAndPruneChildren.call(this, data, numChildren, valueProp, 0, true);
     if (data.value) {
       data.value += data[valueProp];
     } else {
@@ -90,10 +92,11 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
    * @param  {Object}   node         D3 data object of the node.
    * @param  {Number}   numChildren  Number of children of `node.
    * @param  {String}   valueProp    Property name of the propery holding the value of the node's _size_.
-   * @param  {Number}   depth        Depth of the current node.
+   * @param  {Number}   depth        Original depth of the current node.
    * @param  {Boolean}  root         If node is the root.
    */
-  function accumulateAndPruneChildren (node, numChildren, valueProp, depth, root) {
+  function accumulateAndPruneChildren (
+    node, numChildren, valueProp, depth, root) {
     // A reference for later
     node._children = node.children;
     node.meta.depth = depth;
@@ -114,7 +117,9 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
 
       if (numChildChildren) {
         // Inner node.
-        accumulateAndPruneChildren(child, numChildChildren, valueProp, depth + 1);
+        accumulateAndPruneChildren.call(
+          this, child, numChildChildren, valueProp, depth + 1
+        );
         numChildChildren = child.children.length;
       }
 
@@ -137,10 +142,10 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
           });
           child.children[child.children.length - 1][valueProp] = child[valueProp];
         } else {
-          // We `child`, i.e. remove, a node in two cases
-          // A) `child` is the only child pf `node` or
+          // We prune `child`, i.e. remove, a node in two cases
+          // A) `child` is the only child of `node` or
           // B) `child` only has one child.
-          // This was we ensure that the out degree of `child` is two or higher.
+          // This way we ensure that the out degree of `child` is two or higher.
           if (numChildren === 1 || numChildChildren === 1) {
             // We can remove the inner node since it wasn't used for any
             // annotations.
@@ -190,6 +195,8 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
 TreeMapCtrl.prototype.addChildren = function (parent, data, level) {
   var that = this;
 
+  this.counter = 0;
+
   var children = parent.selectAll("g")
     .data(data._children)
     .enter()
@@ -198,10 +205,10 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level) {
   // Recursion
   if (level < this.numLevels) {
     this.children[level + 1] = [];
-    children.each(function (data, index) {
-      if (data._children) {
+    children.each(function (data) {
+      if (data._children && data._children.length) {
         that.children[level + 1].push(
-          that.addChildren.call(that, d3.select(this), data, level + 1)
+          that.addChildren.call(that, that.d3.select(this), data, level + 1)
         );
       }
     });
@@ -211,6 +218,11 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level) {
       return child._children && child._children.length;
     })
     .classed("children", true);
+
+  var childrensLeafs = children.filter(function(child) {
+      return !(child._children && child._children.length);
+    })
+    .classed("leaf", true);
 
   if (level === 1) {
     childrensChildren
@@ -224,42 +236,71 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level) {
       });
   }
 
-  children.selectAll(".child")
+  var childEls = children.selectAll(".child")
     .data(function(d) { return d._children || [d]; })
     .enter()
     .append("rect")
       .attr("class", "child")
       .attr("fill", function(d) {
-        return d.depth ? this.d3.colors((d.meta.branchNo * this.steps) + Math.min(this.steps, d.meta.depth) - 1) : null;
-      }.bind(this))
-      .call(this.rect.bind(this));
-
-  children.append("rect")
-    .attr("class", function (d) {
-      return (d._children && d._children.length) ? 'parent' : 'leaf';
-    })
-    .attr("fill", function(d) {
-      if (!(d._children && d._children.length)) {
         if (d.meta.depth) {
-          return this.d3.colors((d.meta.branchNo * this.steps) + Math.min(this.steps, d.meta.depth) - 1);
+          return this.d3.colors((d.meta.branchNo * this.steps) +
+            Math.min(this.steps, d.meta.depth) - 1);
         }
+        return null;
+      }.bind(this))
+      .call(this.rect.bind(this))
+      .attr('opacity', 0)
+      .transition()
+      .duration(200);
+
+  var parentEls = childrensChildren
+    .append('rect')
+    .attr('class', 'parent')
+    .attr('fill', function (child) {
+      return that.d3.colors(
+        (child.meta.branchNo * this.steps) +
+        Math.min(this.steps, child.meta.depth) - 1
+      );
+    })
+    .call(that.rect.bind(that));
+
+  parentEls
+    .append('title')
+      .text(function(child) {
+        return child.uri || child.name;
+      });
+
+  parentEls
+    .attr('opacity', 0)
+    .transition()
+    .duration(200);
+
+  var leafEls = childrensLeafs
+    .append('use')
+    .attr('stroke', function (leaf) {
+      if (leaf.meta.depth) {
+        return this.d3.colors((leaf.meta.branchNo * this.steps) +
+          Math.min(this.steps, leaf.meta.depth) - 1);
       }
       return null;
     }.bind(this))
-    .call(this.rect.bind(this))
-    .append("title")
-      .text(function(d) {
-        return d.uri || d.name;
+    .attr('xlink:href', '#inner-border-rect')
+    .call(that.rect.bind(that));
+
+  leafEls
+    .append('title')
+      .text(function(leaf) {
+        return leaf.uri || leaf.name;
       });
 
-      // children.filter(function(d) { return !(d._children && d._children.length); })
-      //   .classed("leaf", true)
-      //   .append("rect")
-      //     .attr("class", "inner-border")
-      //     .attr("stroke", function(d) {
-      //       return d.depth ? this.d3.colors((d.meta.branchNo * this.steps) + Math.min(this.steps, d.meta.depth) - 1) : null;
-      //     }.bind(this))
-      //     .call(rect);
+  leafEls
+    .attr('opacity', 0)
+    .transition()
+    .duration(200);
+
+  childEls.attr('opacity', 1);
+  parentEls.attr('opacity', 1);
+  leafEls.attr('opacity', 1);
 
   if (level < 2) {
     children.append('text')
@@ -281,16 +322,15 @@ TreeMapCtrl.prototype.addLevels = function (level) {
 
   that.children[level + 1] = [];
   for (var i = 0, len = this.children[level].length; i < len; i++) {
-    this.children[level][i].each(function (data, index) {
-      if (data._children) {
+    this.children[level][i].each(function (data) {
+      if (data._children && data._children.length) {
         that.children[level + 1].push(
-          that.addChildren.call(that, d3.select(this), data, level + 1)
+          that.addChildren.call(that, that.d3.select(this), data, level + 1)
         );
       }
     });
   }
 
-  console.log(that.children[level + 1]);
   // Check if any children have been added at all.
   if (!that.children[level + 1].length) {
     this.numLevels = level;
@@ -302,10 +342,15 @@ TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
     this.addLevels(oldLevel);
   }
   if (oldLevel > newLevel) {
-    var i;
+    var i, len;
     // Remove all children deeper than what is specified.
     for (i = 0, len = this.children[newLevel + 1].length; i < len; i++) {
-      this.children[newLevel + 1][i].transition().remove();
+      var group = this.children[newLevel + 1][i].transition().duration(250);
+
+      // Fade groups out and remove them
+      group
+        .style("opacity", 0)
+        .remove();
     }
     for (i = newLevel + 1; i <= oldLevel; i++) {
       this.children[i] = undefined;
@@ -329,8 +374,6 @@ TreeMapCtrl.prototype.browseMode = function (mode) {
  * @return  {Object}        D3 selection of node's children.
  */
 TreeMapCtrl.prototype.display = function (node) {
-  var that = this;
-
   // Update the grand parent, which is kind of the "back button"
   this.d3.grandparent
     .datum(node.parent)
@@ -368,7 +411,7 @@ TreeMapCtrl.prototype.draw = function () {
 
   this.initialize(this.data);
   this.accumulateAndPrune(this.data, 'numDataSets');
-  this.layout(this.data);
+  this.layout(this.data, 0);
   this.display(this.data);
 };
 
@@ -397,8 +440,9 @@ TreeMapCtrl.prototype.initialize = function (data) {
  *
  * @param  {Object}  data  D3 data object.
  */
-TreeMapCtrl.prototype.layout = function (data) {
+TreeMapCtrl.prototype.layout = function (data, depth) {
   if (data._children && data._children.length) {
+    this.depth = Math.max(this.depth, depth + 1);
     // This creates an anonymous 1px x 1px treemap and sets the children's
     // coordinates accordingly.
     this.d3.treeMap({_children: data._children});
@@ -409,7 +453,7 @@ TreeMapCtrl.prototype.layout = function (data) {
       child.dx *= data.dx;
       child.dy *= data.dy;
       child.parent = data;
-      this.layout(child);
+      this.layout(child, depth + 1);
     }
   }
 };
@@ -569,6 +613,16 @@ Object.defineProperty(
     configurable: false,
     enumerable: true,
     value: null,
+    writable: true
+});
+
+Object.defineProperty(
+  TreeMapCtrl.prototype,
+  'depth',
+  {
+    configurable: false,
+    enumerable: true,
+    value: 0,
     writable: true
 });
 
