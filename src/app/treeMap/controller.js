@@ -128,8 +128,10 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
           // node.
           child.children.push({
             name: child.name,
-            meta: child.meta,
-            pseudoNode: true,
+            meta: {
+              originalDepth: child.depth + 1,
+              pseudoNode: true
+            },
             value: child[valueProp]
           });
           child.children[child.children.length - 1][valueProp] = child[valueProp];
