@@ -50,8 +50,6 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
     .attr('y', 6)
     .attr('dy', '.75em');
 
-  this.counter = 0;
-
   neo4jD3.d3
     .then(function (data) {
       this.data = data;
@@ -189,8 +187,7 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
 TreeMapCtrl.prototype.addChildren = function (parent, data, level) {
   var that = this;
 
-  this.counter = 0;
-
+  // Create a `g` wrapper for all children.
   var children = parent.selectAll("g")
     .data(data._children)
     .enter()
