@@ -145,14 +145,15 @@
 }
 
 .treeMap g > rect.parent {
-  fill: #ccc;
-  fill-opacity: 0.25;
+  fill: #000;
+  fill-opacity: 0;
 }
 
 .treeMap g:hover > rect.parent {
-  fill: #808080;
+  fill-opacity: 0.5;
 }
 
+.treeMap .leaf text,
 .treeMap .children text {
   font-size: 0.625em;
   line-height: 1.2em;

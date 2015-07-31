@@ -199,22 +199,41 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level) {
     children.each(function (data) {
       if (data._children && data._children.length) {
         that.children[level + 1].push(
-          that.addChildren.call(that, that.d3.select(this), data, level + 1)
+          that.addChildren.call(
+            that, that.d3.select(this), data, level + 1)
         );
       }
     });
   }
 
+  // D3 selection of all children with children
   var childrensChildren = children.filter(function(child) {
       return child._children && child._children.length;
     })
     .classed("children", true);
 
+  // D3 selection of all children without any children, i.e. leafs.
   var childrensLeafs = children.filter(function(child) {
       return !(child._children && child._children.length);
     })
     .classed("leaf", true);
 
+  // Create a child element for all group wrappers
+  var childEls = children.selectAll(".child")
+    .data(function (child) {
+      if (child._children && child._children.length) {
+        return child._children
+      }
+      return [child];
+    })
+    .enter()
+    .append("rect")
+      .attr("class", "child")
+      .attr("fill", this.color.bind(this))
+      .call(this.rect.bind(this));
+
+  // Bind browse transition to click event on groups that have children on the
+  // first level.
   if (level === 1) {
     childrensChildren
       .on("click", function (data) {
@@ -225,56 +244,38 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level) {
          */
         that.transition.call(that, this, data);
       });
+
+    // Add a "parent" rectangle that spans all its children. This is handy to
+    // visualize which set of elements will be zoomed.
+    var parentEls = childrensChildren
+      .append('rect')
+      .attr('class', 'parent')
+      .attr('fill', this.color.bind(this))
+      .call(that.rect.bind(that));
+
+    parentEls
+      .append('title')
+        .text(function(child) {
+          return child.uri || child.name;
+        });
+
+    // parentEls
+    //   .attr('opacity', 0)
+    //   .transition()
+    //   .duration(200);
   }
 
-  var childEls = children.selectAll(".child")
-    .data(function(d) { return d._children || [d]; })
-    .enter()
-    .append("rect")
-      .attr("class", "child")
-      .attr("fill", this.color.bind(this))
-      .call(this.rect.bind(this))
-      .attr('opacity', 0)
-      .transition()
-      .duration(200);
-
-  var parentEls = childrensChildren
-    .append('rect')
-    .attr('class', 'parent')
-    .attr('fill', this.color.bind(this))
-    .call(that.rect.bind(that));
-
-  parentEls
-    .append('title')
-      .text(function(child) {
-        return child.uri || child.name;
-      });
-
-  parentEls
-    .attr('opacity', 0)
-    .transition()
-    .duration(200);
-
-  var leafEls = childrensLeafs
-    .append('use')
-    .attr('stroke', this.color.bind(this))
-    .attr('xlink:href', '#inner-border-rect')
-    .call(that.rect.bind(that));
-
-  leafEls
+  childrensLeafs
     .append('title')
       .text(function(leaf) {
         return leaf.uri || leaf.name;
       });
 
-  leafEls
+  childEls
     .attr('opacity', 0)
     .transition()
-    .duration(200);
-
-  childEls.attr('opacity', 1);
-  parentEls.attr('opacity', 1);
-  leafEls.attr('opacity', 1);
+    .duration(250)
+    .attr('opacity', 1);
 
   if (level < 2) {
     children.append('text')
@@ -299,7 +300,8 @@ TreeMapCtrl.prototype.addLevels = function (level) {
     this.children[level][i].each(function (data) {
       if (data._children && data._children.length) {
         that.children[level + 1].push(
-          that.addChildren.call(that, that.d3.select(this), data, level + 1)
+          that.addChildren.call(
+            that, that.d3.select(this), data, level + 1, true)
         );
       }
     });
@@ -341,6 +343,15 @@ TreeMapCtrl.prototype.browseMode = function (mode) {
   this.mode = mode;
 };
 
+/**
+ * Generate a color given an elements node data object.
+ *
+ * @method  color
+ * @author  Fritz Lekschas
+ * @date    2015-07-31
+ * @param   {Object}  node  D3 node data object.
+ * @return  {String}        HEX color string.
+ */
 TreeMapCtrl.prototype.color = function (node) {
   if (this.colorMode === 'depth') {
     // Color by original depth
@@ -357,9 +368,23 @@ TreeMapCtrl.prototype.color = function (node) {
 }
 
 /**
+ * Provide a color to a DOM's attribute
+ *
+ * @method  colorEl
+ * @author  Fritz Lekschas
+ * @date    2015-07-31
+ * @param   {Object}    element    DOM element created by D3.
+ * @param   {String}    attribute  Name of attribute that should be colored.
+ */
+TreeMapCtrl.prototype.colorEl = function (element, attribute) {
+  element
+    .attr(attribute, this.color.bind(this));
+};
+
+/**
  * Display the data.
  *
- * @param   {[type]}  node  D3 data object of the node.
+ * @param   {Object}  node  D3 data object of the node.
  * @return  {Object}        D3 selection of node's children.
  */
 TreeMapCtrl.prototype.display = function (node) {
@@ -391,7 +416,8 @@ TreeMapCtrl.prototype.display = function (node) {
   // For completeness we store the children of level zero.
   this.children[0] = [this.d3.groupWrapper];
 
-  var children = this.addChildren.call(this, this.d3.groupWrapper, node, 1);
+  var children = this.addChildren.call(
+    this, this.d3.groupWrapper, node, 1);
 
   // We have to cache the children to dynamically adjust the level depth.
   this.children[1] = [children];
@@ -547,8 +573,14 @@ TreeMapCtrl.prototype.transition = function (el, data) {
 
   this.d3.transitioning = true;
 
-  var newGroups = this.display.call(this, data).transition().duration(750),
-    formerGroupWrapper = this.d3.formerGroupWrapper.transition().duration(750);
+  // We need to delay the zoom transition to allow the fade-in transition of
+  // to fully end. This is solution is not ideal but chaining transitions like
+  // described at http://stackoverflow.com/a/17101823/981933 is infeasable
+  // since an unknown number of multiple selections has to be transitioned first
+  var newGroups = this.display.call(this, data)
+      .transition().duration(750).delay(250),
+    formerGroupWrapper = this.d3.formerGroupWrapper
+      .transition().duration(750).delay(250);
 
   // Update the domain only after entering new elements.
   this.d3.x.domain([data.x, data.x + data.dx]);
@@ -580,13 +612,7 @@ TreeMapCtrl.prototype.transition = function (el, data) {
   formerGroupWrapper.selectAll("rect")
     .call(this.rect.bind(this));
 
-  formerGroupWrapper.selectAll("use")
-    .call(this.rect.bind(this));
-
   newGroups.selectAll("rect")
-    .call(this.rect.bind(this));
-
-  newGroups.selectAll("use")
     .call(this.rect.bind(this));
 
   // Remove the old node when the transition is finished.
