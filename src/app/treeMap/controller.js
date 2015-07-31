@@ -99,7 +99,7 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
   function accumulateAndPruneChildren (node, numChildren, valueProp, depth) {
     // A reference for later
     node._children = node.children;
-    node.meta.depth = depth;
+    node.meta.originalDepth = depth;
     var i = numChildren;
     // We move in reverse order so that deleting nodes doesn't affect future
     // indices.
@@ -166,7 +166,7 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
           // Set `value` of the leaf itself.
           child.value = child[valueProp];
           child.meta.leaf = true;
-          child.meta.depth = depth + 1;
+          child.meta.originalDepth = depth + 1;
         }
       }
 
@@ -349,7 +349,7 @@ TreeMapCtrl.prototype.color = function (node) {
     // Color by original depth
     // The deeper the node, the lighter the color
     return this.d3.colors((node.meta.branchNo[0] * this.steps) +
-      Math.min(this.steps, node.meta.depth) - 1);
+      Math.min(this.steps, node.meta.originalDepth) - 1);
   }
   // Default:
   // Color by reverse final depth, i.e. after pruning. The fewer children a node
@@ -445,6 +445,7 @@ TreeMapCtrl.prototype.initialize = function (data) {
  * @param  {Object}  data  D3 data object.
  */
 TreeMapCtrl.prototype.layout = function (parent, depth) {
+  parent.meta.depth = depth;
   if (parent._children && parent._children.length) {
     this.depth = Math.max(this.depth, depth + 1);
     // This creates an anonymous 1px x 1px treemap and sets the children's
@@ -543,12 +544,9 @@ TreeMapCtrl.prototype.text = function (el) {
  * @param   {Object}  data  D3 data object of the node to transition to.
  */
 TreeMapCtrl.prototype.transition = function (el, data) {
-  console.log('hurz', el, data);
   if (this.d3.transitioning || !data) {
     return;
   }
-
-  console.log(data.name, el, data)
 
   this.d3.transitioning = true;
 
