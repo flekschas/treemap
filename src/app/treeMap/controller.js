@@ -8,44 +8,44 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
 
   this._numLevels = 3;
 
-  this.d3.width = this.$d3Element.width();
-  this.d3.height = this.$d3Element.height();
+  this.treeMap.width = this.$d3Element.width();
+  this.treeMap.height = this.$d3Element.height();
 
   this.numColors = 10;
   this.steps = 6;
 
-  this.d3.colors = new D3Colors(
-    d3.scale.category10().domain(d3.range(this.numColors)).range()
+  this.treeMap.colors = new D3Colors(
+    this.d3.scale.category10().domain(d3.range(this.numColors)).range()
   ).getScaledFadedColors(this.steps);
 
-  this.d3.x = this.d3.scale.linear()
-    .domain([0, this.d3.width])
-    .range([0, this.d3.width]);
+  this.treeMap.x = this.d3.scale.linear()
+    .domain([0, this.treeMap.width])
+    .range([0, this.treeMap.width]);
 
-  this.d3.y = this.d3.scale.linear()
-    .domain([0, this.d3.height])
-    .range([0, this.d3.height]);
+  this.treeMap.y = this.d3.scale.linear()
+    .domain([0, this.treeMap.height])
+    .range([0, this.treeMap.height]);
 
-  this.d3.treeMap = this.d3.layout.treemap()
+  this.treeMap.el = this.d3.layout.treemap()
     .children(function(d, depth) { return depth ? null : d._children; })
     .sort(function(a, b) { return a.value - b.value; })
-    .ratio(this.d3.height / this.d3.width * 0.5 * (1 + Math.sqrt(5)))
+    .ratio(this.treeMap.height / this.treeMap.width * 0.5 * (1 + Math.sqrt(5)))
     .round(false);
 
-  this.d3.element = this.d3.select(this.$d3Element[0])
-    .attr('viewBox', '0 0 ' + this.d3.width + ' ' + this.d3.height)
+  this.treeMap.element = this.d3.select(this.$d3Element[0])
+    .attr('viewBox', '0 0 ' + this.treeMap.width + ' ' + this.treeMap.height)
     .append('g')
       .style('shape-rendering', 'crispEdges');
 
-  this.d3.grandparent = this.d3.element.append('g')
+  this.treeMap.grandparent = this.treeMap.element.append('g')
     .attr('class', 'grandparent');
 
-  this.d3.grandparent.append('rect')
+  this.treeMap.grandparent.append('rect')
     .attr('y', 0)
-    .attr('width', this.d3.width)
+    .attr('width', this.treeMap.width)
     .attr('height', 0);
 
-  this.d3.grandparent.append('text')
+  this.treeMap.grandparent.append('text')
     .attr('x', 6)
     .attr('y', 6)
     .attr('dy', '.75em');
@@ -358,14 +358,14 @@ TreeMapCtrl.prototype.color = function (node) {
   if (this.colorMode === 'depth') {
     // Color by original depth
     // The deeper the node, the lighter the color
-    return this.d3.colors((node.meta.branchNo[0] * this.steps) +
+    return this.treeMap.colors((node.meta.branchNo[0] * this.steps) +
       Math.min(this.steps, node.meta.originalDepth) - 1);
   }
   // Default:
   // Color by reverse final depth, i.e. after pruning. The fewer children a node
   // has, the lighter the color. E.g. a leaf is lightest while the root is
   // darkest.
-  return this.d3.colors((node.meta.branchNo[0] * this.steps) +
+  return this.treeMap.colors((node.meta.branchNo[0] * this.steps) +
     Math.max(0, this.steps - node.meta.revDepth - 1));
 }
 
@@ -393,7 +393,7 @@ TreeMapCtrl.prototype.display = function (node) {
   var that = this;
 
   // Update the grand parent, which is kind of the "back button"
-  this.d3.grandparent
+  this.treeMap.grandparent
     .datum(node.parent)
     .on("click", function (data) {
       /*
@@ -407,19 +407,19 @@ TreeMapCtrl.prototype.display = function (node) {
       .text(this.name(node));
 
   // Keep a reference to the old wrapper
-  this.d3.formerGroupWrapper = this.d3.groupWrapper;
+  this.treeMap.formerGroupWrapper = this.treeMap.groupWrapper;
 
   // Create a new wrapper group for the children.
-  this.d3.groupWrapper = this.d3.element
+  this.treeMap.groupWrapper = this.treeMap.element
     .insert("g", ".grandparent")
     .datum(node)
     .attr("class", "depth");
 
   // For completeness we store the children of level zero.
-  this.children[0] = [this.d3.groupWrapper];
+  this.children[0] = [this.treeMap.groupWrapper];
 
   var children = this.addChildren.call(
-    this, this.d3.groupWrapper, node, 1);
+    this, this.treeMap.groupWrapper, node, 1);
 
   // We have to cache the children to dynamically adjust the level depth.
   this.children[1] = [children];
@@ -448,8 +448,8 @@ TreeMapCtrl.prototype.draw = function () {
  */
 TreeMapCtrl.prototype.initialize = function (data) {
   data.x = data.y = 0;
-  data.dx = this.d3.width;
-  data.dy = this.d3.height;
+  data.dx = this.treeMap.width;
+  data.dy = this.treeMap.height;
   data.depth = 0;
   data.meta = {
     branchNo: []
@@ -475,7 +475,7 @@ TreeMapCtrl.prototype.layout = function (parent, depth) {
     this.depth = Math.max(this.depth, depth + 1);
     // This creates an anonymous 1px x 1px treemap and sets the children's
     // coordinates accordingly.
-    this.d3.treeMap({_children: parent._children});
+    this.treeMap.el({_children: parent._children});
     for (var i = 0, len = parent._children.length; i < len; i++) {
       var child = parent._children[i];
       child.x = parent.x + child.x * parent.dx;
@@ -528,16 +528,16 @@ TreeMapCtrl.prototype.rect = function (elements) {
 
   elements
     .attr("x", function (data) {
-      return that.d3.x(data.x);
+      return that.treeMap.x(data.x);
     })
     .attr("y", function (data) {
-      return that.d3.y(data.y);
+      return that.treeMap.y(data.y);
     })
     .attr("width", function (data) {
-      return that.d3.x(data.x + data.dx) - that.d3.x(data.x);
+      return that.treeMap.x(data.x + data.dx) - that.treeMap.x(data.x);
     })
     .attr("height", function (data) {
-      return that.d3.y(data.y + data.dy) - that.d3.y(data.y);
+      return that.treeMap.y(data.y + data.dy) - that.treeMap.y(data.y);
     });
 };
 
@@ -556,10 +556,10 @@ TreeMapCtrl.prototype.text = function (el) {
   var that = this;
 
   el.attr("x", function(data) {
-      return that.d3.x(data.x) + 6;
+      return that.treeMap.x(data.x) + 3;
     })
     .attr("y", function(data) {
-      return that.d3.y(data.y) + 6;
+      return that.treeMap.y(data.y) + 4;
     });
 };
 
@@ -569,11 +569,11 @@ TreeMapCtrl.prototype.text = function (el) {
  * @param   {Object}  data  D3 data object of the node to transition to.
  */
 TreeMapCtrl.prototype.transition = function (el, data) {
-  if (this.d3.transitioning || !data) {
+  if (this.treeMap.transitioning || !data) {
     return;
   }
 
-  this.d3.transitioning = true;
+  this.treeMap.transitioning = true;
 
   // We need to delay the zoom transition to allow the fade-in transition of
   // to fully end. This is solution is not ideal but chaining transitions like
@@ -581,18 +581,18 @@ TreeMapCtrl.prototype.transition = function (el, data) {
   // since an unknown number of multiple selections has to be transitioned first
   var newGroups = this.display.call(this, data)
       .transition().duration(750).delay(250),
-    formerGroupWrapper = this.d3.formerGroupWrapper
+    formerGroupWrapper = this.treeMap.formerGroupWrapper
       .transition().duration(750).delay(250);
 
   // Update the domain only after entering new elements.
-  this.d3.x.domain([data.x, data.x + data.dx]);
-  this.d3.y.domain([data.y, data.y + data.dy]);
+  this.treeMap.x.domain([data.x, data.x + data.dx]);
+  this.treeMap.y.domain([data.y, data.y + data.dy]);
 
   // Enable anti-aliasing during the transition.
-  this.d3.element.style("shape-rendering", null);
+  this.treeMap.element.style("shape-rendering", null);
 
   // // Draw child nodes on top of parent nodes.
-  // this.d3.element
+  // this.treeMap.element
   //   .selectAll(".depth")
   //   .sort(function(a, b) {
   //     return a.depth - b.depth;
@@ -620,8 +620,8 @@ TreeMapCtrl.prototype.transition = function (el, data) {
   // Remove the old node when the transition is finished.
   formerGroupWrapper.remove()
     .each("end", function() {
-      this.d3.element.style("shape-rendering", "crispEdges");
-      this.d3.transitioning = false;
+      this.treeMap.element.style("shape-rendering", "crispEdges");
+      this.treeMap.transitioning = false;
     }.bind(this));
 };
 
@@ -642,16 +642,6 @@ Object.defineProperty(
     writable: true
   }
 );
-
-Object.defineProperty(
-  TreeMapCtrl.prototype,
-  'd3',
-  {
-    configurable: false,
-    enumerable: true,
-    value: {},
-    writable: true
-});
 
 Object.defineProperty(
   TreeMapCtrl.prototype,
@@ -707,6 +697,16 @@ Object.defineProperty(
       this._numLevels = Math.max(1, numLevels);
       this.adjustLevelDepth(oldLevel, this.numLevels);
     }
+});
+
+Object.defineProperty(
+  TreeMapCtrl.prototype,
+  'treeMap',
+  {
+    configurable: false,
+    enumerable: true,
+    value: {},
+    writable: true
 });
 
 angular
