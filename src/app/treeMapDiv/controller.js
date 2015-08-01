@@ -1,12 +1,12 @@
 /* global angular:false */
 
-function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
+function TreeMapDivCtrl ($element, $, d3, neo4jD3, D3Colors) {
   this.$ = $;
   this.d3 = d3;
   this.$element = this.$($element),
-  this.$d3Element = this.$element.find('.treeMap svg');
+  this.$d3Element = this.$element.find('.treeMap');
 
-  this._numLevels = 3;
+  this._visibleDepth = 3;
 
   this.treeMap.width = this.$d3Element.width();
   this.treeMap.height = this.$d3Element.height();
@@ -32,24 +32,9 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
     .ratio(this.treeMap.height / this.treeMap.width * 0.5 * (1 + Math.sqrt(5)))
     .round(false);
 
-  this.treeMap.element = this.d3.select(this.$d3Element[0])
-    .attr('viewBox', '0 0 ' + this.treeMap.width + ' ' + this.treeMap.height)
-    .append('g')
-      .style('shape-rendering', 'crispEdges');
+  this.treeMap.element = this.d3.select(this.$d3Element[0]);
 
-  this.treeMap.grandparent = this.treeMap.element
-    .append('g')
-    .attr('class', 'grandparent');
-
-  this.treeMap.grandparent.append('rect')
-    .attr('y', 0)
-    .attr('width', this.treeMap.width)
-    .attr('height', 0);
-
-  this.treeMap.grandparent.append('text')
-    .attr('x', 6)
-    .attr('y', 6)
-    .attr('dy', '.75em');
+  this.treeMap.grandparent = this.d3.select('#back');
 
   neo4jD3.d3
     .then(function (data) {
@@ -70,7 +55,7 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
  * @param  {Object} data       D3 data object.
  * @param  {String} valueProp  Name of the property holding the value.
  */
-TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
+TreeMapDivCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
   var numChildren = data.children ? data.children.length : false;
   data.meta = data.meta || {};
 
@@ -181,115 +166,80 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
   }
 };
 
+
 /**
- * Recursively add children to the parent until a given threshold.
+ * Recursively add nodes level by level.
  *
- * @param {[type]} parent [description]
- * @param {[type]} level  [description]
+ * @method  addChildren
+ * @author  Fritz Lekschas
+ * @date    2015-08-01
+ * @param   {[type]}     parent  [description]
+ * @param   {[type]}     data    [description]
+ * @param   {[type]}     level   [description]
  */
-TreeMapCtrl.prototype.addChildren = function (parent, data, level) {
+TreeMapDivCtrl.prototype.addChildren = function (parent, data, level) {
   var that = this;
 
-  // Create a `g` wrapper for all children.
-  var children = parent.selectAll("g")
+  // Create nodes
+  var nodes = parent.selectAll('div')
     .data(data._children)
     .enter()
-      .append("g");
+      .append('div')
+      .attr('class', function (node) {
+        var classes = 'node';
+        if (node._children && node._children.length) {
+          classes += ' inner-node';
+        } else {
+          classes += ' leaf';
+        }
+        if (level == this.visibleDepth) {
+          classes += ' last';
+        }
+        // Hide nodes if they are deeper than the specified `depth`
+        if (level > this.visibleDepth) {
+          classes += ' hidden';
+        } else {
+          console.log(level, node.meta.depth, this.visibleDepth);
+        }
+        return classes;
+      }.bind(this))
+      .attr('title', function (node) {
+        return node.uri;
+      })
+      .style('background-color', this.color.bind(this))
+      .call(that.coordinates.bind(that));
 
-  // Recursion
-  if (level < this.numLevels) {
-    this.children[level + 1] = [];
-    children.each(function (data) {
-      if (data._children && data._children.length) {
-        that.children[level + 1].push(
-          that.addChildren.call(
-            that, that.d3.select(this), data, level + 1)
-        );
+  // Add name to nodes
+  nodes.append('span')
+    .attr('class', function (node) {
+      var classes = 'name';
+      if (node.meta.aspectRatio < 1) {
+        classes += ' rotated';
       }
-    });
-  }
-
-  // D3 selection of all children with children
-  var childrensChildren = children.filter(function(child) {
-      return child._children && child._children.length;
+      return classes;
     })
-    .classed("children", true);
+    .text(function(node) { return node.name; });
 
-  // D3 selection of all children without any children, i.e. leafs.
-  var childrensLeafs = children.filter(function(child) {
-      return !(child._children && child._children.length);
-    })
-    .classed("leaf", true);
+  this.nodesAtLevel[level + 1] = [];
 
-  // Create a child element for all group wrappers
-  var childEls = childrensChildren.selectAll(".child")
-    .data(function (child) {
-      if (child._children && child._children.length) {
-        return child._children
-      }
-      return [child];
-    })
-    .enter()
-    .append("rect")
-      .attr("class", "child")
-      .attr("fill", this.color.bind(this))
-      .call(this.rect.bind(this), level);
+  nodes.each(function (node) {
+    if (node._children && node._children.length) {
+      // Recursion
+      that.nodesAtLevel[level + 1].push(
+        that.addChildren(that.d3.select(this), node, level + 1)
+      );
+    }
+  });
 
-  // Create
+  return nodes;
+};
 
-  // Bind browse transition to click event on groups that have children on the
-  // first level.
-  if (level === 1) {
-    childrensChildren
-      .on("click", function (data) {
-        /*
-         * that = TreeMapCtrl
-         * this = the clicked DOM element
-         * data = data
-         */
-        that.transition.call(that, this, data);
-      });
+TreeMapDivCtrl.prototype.addClickListener = function () {
+  var that = this;
 
-    // Add a "parent" rectangle that spans all its children. This is handy to
-    // visualize which set of elements will be zoomed.
-    var parentEls = childrensChildren
-      .append('rect')
-      .attr('class', 'parent')
-      .attr('fill', this.color.bind(this))
-      .call(that.rect.bind(that));
-
-    parentEls
-      .append('title')
-        .text(function(child) {
-          return child.uri || child.name;
-        });
-
-    // parentEls
-    //   .attr('opacity', 0)
-    //   .transition()
-    //   .duration(200);
-  }
-
-  childrensLeafs
-    .append('title')
-      .text(function(leaf) {
-        return leaf.uri || leaf.name;
-      });
-
-  childEls
-    .attr('opacity', 0)
-    .transition()
-    .duration(250)
-    .attr('opacity', 1);
-
-  if (level < 2) {
-    children.append('text')
-      .attr('dy', '.75em')
-      .text(function(child) { return child.name; })
-      .call(this.text.bind(this));
-  }
-
-  return children;
+  $(this.treeMap.element).on('click', '.inner-node', function (event) {
+    that.transition(this, d3.select(this).data());
+  });
 };
 
 /**
@@ -297,14 +247,14 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level) {
  *
  * @param  {Number}  level  Starting level.
  */
-TreeMapCtrl.prototype.addLevels = function (level) {
+TreeMapDivCtrl.prototype.addLevels = function (level) {
   var that = this;
 
-  that.children[level + 1] = [];
-  for (var i = 0, len = this.children[level].length; i < len; i++) {
-    this.children[level][i].each(function (data) {
+  that.nodesAtLevel[level + 1] = [];
+  for (var i = 0, len = this.nodesAtLevel[level].length; i < len; i++) {
+    this.nodesAtLevel[level][i].each(function (data) {
       if (data._children && data._children.length) {
-        that.children[level + 1].push(
+        that.nodesAtLevel[level + 1].push(
           that.addChildren.call(
             that, that.d3.select(this), data, level + 1, true)
         );
@@ -313,20 +263,20 @@ TreeMapCtrl.prototype.addLevels = function (level) {
   }
 
   // Check if any children have been added at all.
-  if (!that.children[level + 1].length) {
+  if (!that.nodesAtLevel[level + 1].length) {
     this.numLevels = level;
   }
 };
 
-TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
+TreeMapDivCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
   if (oldLevel < newLevel) {
     this.addLevels(oldLevel);
   }
   if (oldLevel > newLevel) {
     var i, len;
     // Remove all children deeper than what is specified.
-    for (i = 0, len = this.children[newLevel + 1].length; i < len; i++) {
-      var group = this.children[newLevel + 1][i].transition().duration(250);
+    for (i = 0, len = this.nodesAtLevel[newLevel + 1].length; i < len; i++) {
+      var group = this.nodesAtLevel[newLevel + 1][i].transition().duration(250);
 
       // Fade groups out and remove them
       group
@@ -334,7 +284,7 @@ TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
         .remove();
     }
     for (i = newLevel + 1; i <= oldLevel; i++) {
-      this.children[i] = undefined;
+      this.nodesAtLevel[i] = undefined;
     }
   }
 };
@@ -344,7 +294,7 @@ TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
  *
  * @param  {String}  mode  Name of the mode.
  */
-TreeMapCtrl.prototype.browseMode = function (mode) {
+TreeMapDivCtrl.prototype.browseMode = function (mode) {
   this.mode = mode;
 };
 
@@ -357,7 +307,7 @@ TreeMapCtrl.prototype.browseMode = function (mode) {
  * @param   {Object}  node  D3 node data object.
  * @return  {String}        HEX color string.
  */
-TreeMapCtrl.prototype.color = function (node) {
+TreeMapDivCtrl.prototype.color = function (node) {
   if (this.colorMode === 'depth') {
     // Color by original depth
     // The deeper the node, the lighter the color
@@ -381,7 +331,7 @@ TreeMapCtrl.prototype.color = function (node) {
  * @param   {Object}    element    DOM element created by D3.
  * @param   {String}    attribute  Name of attribute that should be colored.
  */
-TreeMapCtrl.prototype.colorEl = function (element, attribute) {
+TreeMapDivCtrl.prototype.colorEl = function (element, attribute) {
   element
     .attr(attribute, this.color.bind(this));
 };
@@ -392,7 +342,7 @@ TreeMapCtrl.prototype.colorEl = function (element, attribute) {
  * @param   {Object}  node  D3 data object of the node.
  * @return  {Object}        D3 selection of node's children.
  */
-TreeMapCtrl.prototype.display = function (node) {
+TreeMapDivCtrl.prototype.display = function (node) {
   var that = this;
 
   // Update the grand parent, which is kind of the "back button"
@@ -400,32 +350,25 @@ TreeMapCtrl.prototype.display = function (node) {
     .datum(node.parent)
     .on("click", function (data) {
       /*
-       * that = TreeMapCtrl
+       * that = TreeMapDivCtrl
        * this = the clicked DOM element
        * data = data
        */
       that.transition.call(that, this, data);
     })
-    .select("text")
-      .text(this.name(node));
+    .text(this.name(node));
 
-  // Keep a reference to the old wrapper
-  this.treeMap.formerGroupWrapper = this.treeMap.groupWrapper;
-
-  // Create a new wrapper group for the children.
-  this.treeMap.groupWrapper = this.treeMap.element
-    .insert("g", ".grandparent")
-    .datum(node)
-    .attr("class", "depth");
+  this.treeMap.element
+    .datum(node);
 
   // For completeness we store the children of level zero.
-  this.children[0] = [this.treeMap.groupWrapper];
+  this.nodesAtLevel[0] = [this.treeMap.element];
 
   var children = this.addChildren.call(
-    this, this.treeMap.groupWrapper, node, 1);
+    this, this.treeMap.element, node, 1);
 
   // We have to cache the children to dynamically adjust the level depth.
-  this.children[1] = [children];
+  this.nodesAtLevel[1] = [children];
 
   return children;
 };
@@ -433,15 +376,18 @@ TreeMapCtrl.prototype.display = function (node) {
 /**
  * Draw the treemap.
  */
-TreeMapCtrl.prototype.draw = function () {
+TreeMapDivCtrl.prototype.draw = function () {
   if (this.data === null) {
     return false;
   }
+
+  console.log('vdepth ' + this.visibleDepth);
 
   this.initialize(this.data);
   this.accumulateAndPrune(this.data, 'numDataSets');
   this.layout(this.data, 0);
   this.display(this.data);
+  this.addClickListener();
 };
 
 /**
@@ -449,7 +395,7 @@ TreeMapCtrl.prototype.draw = function () {
  *
  * @param  {Object} data  D3 data object.
  */
-TreeMapCtrl.prototype.initialize = function (data) {
+TreeMapDivCtrl.prototype.initialize = function (data) {
   data.x = data.y = 0;
   data.dx = this.treeMap.width;
   data.dy = this.treeMap.height;
@@ -472,24 +418,33 @@ TreeMapCtrl.prototype.initialize = function (data) {
  *
  * @param  {Object}  data  D3 data object.
  */
-TreeMapCtrl.prototype.layout = function (parent, depth) {
+TreeMapDivCtrl.prototype.layout = function (parent, depth) {
   parent.meta.depth = depth;
   if (parent._children && parent._children.length) {
-    this.depth = Math.max(this.depth, depth + 1);
+    this.treeMap.depth = Math.max(this.treeMap.depth, depth + 1);
     // This creates an anonymous 1px x 1px treemap and sets the children's
     // coordinates accordingly.
     this.treeMap.el({_children: parent._children});
     for (var i = 0, len = parent._children.length; i < len; i++) {
       var child = parent._children[i];
-      child.x = parent.x + child.x * parent.dx;
-      child.y = parent.y + child.y * parent.dy;
+      child.x = child.x * parent.dx;
+      child.y = child.y * parent.dy;
       child.dx *= parent.dx;
       child.dy *= parent.dy;
       child.parent = parent;
 
+      // Store aspect ration and area for later font styling
+      child.meta.aspectRatio = child.dx / child.dy;
+      child.meta.area = child.dy * child.dx;
+
+      // Keep a reference of the branches that have been taken
       child.meta.branchNo = parent.meta.branchNo.concat([i]);
 
+      // Recursion
       this.layout(child, depth + 1);
+
+      // Take the max reverse depth when we visite the inner node the second
+      // time.
       parent.meta.revDepth = Math.max(
         child.meta.revDepth + 1,
         parent.meta.revDepth || 0
@@ -508,7 +463,7 @@ TreeMapCtrl.prototype.layout = function (parent, depth) {
  * @param   {Object}  data  Node's D3 data object.
  * @return  {String}        Name of the node.
  */
-TreeMapCtrl.prototype.name = function (data) {
+TreeMapDivCtrl.prototype.name = function (data) {
     return data.parent ? this.name(data.parent) + "." + data.name : data.name;
 };
 /**
@@ -519,50 +474,28 @@ TreeMapCtrl.prototype.name = function (data) {
  *
  * Note: This weird looking double this is needed as the context of a `call`
  * function is actually the same as the selection passed to it, which seems
- * redundant but that's how it works right now. So to assign `TreeMapCtrl` as
+ * redundant but that's how it works right now. So to assign `TreeMapDivCtrl` as
  * the context we have to manually bind `this`.
  *
  * URL: https://github.com/mbostock/d3/wiki/Selections#call
  *
  * @param  {Array}  elements  D3 selection of DOM elements.
  */
-TreeMapCtrl.prototype.rect = function (elements) {
+TreeMapDivCtrl.prototype.coordinates = function (elements) {
   var that = this;
 
   elements
-    .attr("x", function (data) {
-      return that.treeMap.x(data.x);
+    .style('left', function (data) {
+      return that.treeMap.x(data.x) + 'px';
     })
-    .attr("y", function (data) {
-      return that.treeMap.y(data.y);
+    .style('top', function (data) {
+      return that.treeMap.y(data.y) + 'px';
     })
-    .attr("width", function (data) {
-      return that.treeMap.x(data.x + data.dx) - that.treeMap.x(data.x);
+    .style('width', function (data) {
+      return (that.treeMap.x(data.x + data.dx) - that.treeMap.x(data.x)) + 'px';
     })
-    .attr("height", function (data) {
-      return that.treeMap.y(data.y + data.dy) - that.treeMap.y(data.y);
-    });
-};
-
-/**
- * Set the coordinates of the text node.
- *
- * How to invoke:
- * `d3.selectAll('text').call(this.rect.bind(this))`
- *
- * Note: See TreeMapCtrl.prototype.rect
- *
- * @param  {[type]} el [description]
- * @return {[type]}    [description]
- */
-TreeMapCtrl.prototype.text = function (el) {
-  var that = this;
-
-  el.attr("x", function(data) {
-      return that.treeMap.x(data.x) + 3;
-    })
-    .attr("y", function(data) {
-      return that.treeMap.y(data.y) + 4;
+    .style('height', function (data) {
+      return (that.treeMap.y(data.y + data.dy) - that.treeMap.y(data.y)) + 'px';
     });
 };
 
@@ -571,7 +504,7 @@ TreeMapCtrl.prototype.text = function (el) {
  *
  * @param   {Object}  data  D3 data object of the node to transition to.
  */
-TreeMapCtrl.prototype.transition = function (el, data) {
+TreeMapDivCtrl.prototype.transition = function (el, data) {
   if (this.treeMap.transitioning || !data) {
     return;
   }
@@ -636,8 +569,8 @@ TreeMapCtrl.prototype.transition = function (el, data) {
  */
 
 Object.defineProperty(
-  TreeMapCtrl.prototype,
-  'children',
+  TreeMapDivCtrl.prototype,
+  'nodesAtLevel',
   {
     configurable: false,
     enumerable: true,
@@ -647,7 +580,7 @@ Object.defineProperty(
 );
 
 Object.defineProperty(
-  TreeMapCtrl.prototype,
+  TreeMapDivCtrl.prototype,
   'data',
   {
     configurable: false,
@@ -657,27 +590,7 @@ Object.defineProperty(
 });
 
 Object.defineProperty(
-  TreeMapCtrl.prototype,
-  'depth',
-  {
-    configurable: false,
-    enumerable: true,
-    value: 0,
-    writable: true
-});
-
-Object.defineProperty(
-  TreeMapCtrl.prototype,
-  'levels',
-  {
-    configurable: false,
-    enumerable: true,
-    value: [],
-    writable: true
-});
-
-Object.defineProperty(
-  TreeMapCtrl.prototype,
+  TreeMapDivCtrl.prototype,
   'mode',
   {
     configurable: false,
@@ -687,23 +600,23 @@ Object.defineProperty(
 });
 
 Object.defineProperty(
-  TreeMapCtrl.prototype,
-  'numLevels',
+  TreeMapDivCtrl.prototype,
+  'visibleDepth',
   {
     configurable: false,
     enumerable: true,
     get: function () {
-      return this._numLevels;
+      return this._visibleDepth;
     },
-    set: function (numLevels) {
-      var oldLevel = this._numLevels;
-      this._numLevels = Math.max(1, numLevels);
-      this.adjustLevelDepth(oldLevel, this.numLevels);
+    set: function (visibleDepth) {
+      var oldLevel = this._visibleDepth;
+      this._visibleDepth = Math.max(1, visibleDepth);
+      this.adjustLevelDepth(oldLevel, this.visibleDepth);
     }
 });
 
 Object.defineProperty(
-  TreeMapCtrl.prototype,
+  TreeMapDivCtrl.prototype,
   'treeMap',
   {
     configurable: false,
@@ -713,12 +626,12 @@ Object.defineProperty(
 });
 
 angular
-  .module('treeMap')
-  .controller('TreeMapCtrl', [
+  .module('treeMapDiv')
+  .controller('TreeMapDivCtrl', [
     '$element',
     '$',
     'd3',
     'neo4jD3',
     'D3Colors',
-    TreeMapCtrl
+    TreeMapDivCtrl
   ]);
