@@ -1,6 +1,7 @@
 /* global angular:false */
 
-function TreeMapDivCtrl ($element, $, d3, neo4jD3, D3Colors) {
+function TreeMapDivCtrl ($window, $element, $, d3, neo4jD3, D3Colors) {
+  this.$window = $window;
   this.$ = $;
   this.d3 = d3;
   this.$element = this.$($element),
@@ -177,7 +178,8 @@ TreeMapDivCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
  * @param   {[type]}     data    [description]
  * @param   {[type]}     level   [description]
  */
-TreeMapDivCtrl.prototype.addChildren = function (parent, data, level) {
+TreeMapDivCtrl.prototype.addChildren = function (
+  parent, data, level, firstTime) {
   var that = this;
 
   // Create nodes
@@ -191,22 +193,26 @@ TreeMapDivCtrl.prototype.addChildren = function (parent, data, level) {
           classes += ' inner-node';
         } else {
           classes += ' leaf';
+          node.visibility = true;
         }
         if (level == this.visibleDepth) {
           classes += ' last';
+          node.visibility = true;
         }
         // Hide nodes if they are deeper than the specified `depth`
         if (level > this.visibleDepth) {
           classes += ' hidden';
-        } else {
-          console.log(level, node.meta.depth, this.visibleDepth);
         }
         return classes;
       }.bind(this))
       .attr('title', function (node) {
         return node.uri;
       })
-      .style('background-color', this.color.bind(this))
+      .style('background-color', function (node) {
+        if (node.visibility) {
+          return this.color(node);
+        }
+      }.bind(this))
       .call(that.coordinates.bind(that));
 
   // Add name to nodes
@@ -223,10 +229,35 @@ TreeMapDivCtrl.prototype.addChildren = function (parent, data, level) {
   this.nodesAtLevel[level + 1] = [];
 
   nodes.each(function (node) {
+
+    if (firstTime && node.visibility) {
+      var $el = $(this);
+
+      $el
+        .css({
+          'opacity': 0,
+          'transform': 'scale(0.9)'
+        });
+
+      that.$window.requestNextAnimationFrame(function() {
+        $el
+          .css('transitionDuration', function () {
+            return ((500 + parseInt(Math.random() * 750)) / 1000) + 's';
+          })
+          .css('transitionDelay', function () {
+            return (parseInt(Math.random() * 500) / 1000) + 's';
+          })
+          .css({
+            'opacity': 1,
+            'transform': 'scale(1)'
+          });
+      });
+    }
+
     if (node._children && node._children.length) {
       // Recursion
       that.nodesAtLevel[level + 1].push(
-        that.addChildren(that.d3.select(this), node, level + 1)
+        that.addChildren(that.d3.select(this), node, level + 1, firstTime)
       );
     }
   });
@@ -342,7 +373,7 @@ TreeMapDivCtrl.prototype.colorEl = function (element, attribute) {
  * @param   {Object}  node  D3 data object of the node.
  * @return  {Object}        D3 selection of node's children.
  */
-TreeMapDivCtrl.prototype.display = function (node) {
+TreeMapDivCtrl.prototype.display = function (node, firstTime) {
   var that = this;
 
   // Update the grand parent, which is kind of the "back button"
@@ -365,7 +396,7 @@ TreeMapDivCtrl.prototype.display = function (node) {
   this.nodesAtLevel[0] = [this.treeMap.element];
 
   var children = this.addChildren.call(
-    this, this.treeMap.element, node, 1);
+    this, this.treeMap.element, node, 1, firstTime);
 
   // We have to cache the children to dynamically adjust the level depth.
   this.nodesAtLevel[1] = [children];
@@ -386,7 +417,7 @@ TreeMapDivCtrl.prototype.draw = function () {
   this.initialize(this.data);
   this.accumulateAndPrune(this.data, 'numDataSets');
   this.layout(this.data, 0);
-  this.display(this.data);
+  this.display(this.data, true);
   this.addClickListener();
 };
 
@@ -628,6 +659,7 @@ Object.defineProperty(
 angular
   .module('treeMapDiv')
   .controller('TreeMapDivCtrl', [
+    '$window',
     '$element',
     '$',
     'd3',
