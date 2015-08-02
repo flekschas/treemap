@@ -40,6 +40,8 @@ var sourcePaths = {
 };
 
 var vendorPaths = [
+  'custom_components/raf.js',
+  'custom_components/rnaf.js',
   'bower_components/angular/angular.js',
   'bower_components/angular-resource/angular-resource.js',
   'bower_components/d3/d3.js',
