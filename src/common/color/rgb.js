@@ -91,6 +91,33 @@ angular
       );
     };
 
+    RGB.prototype.luminosity = function (red, green, blue) {
+      // http://www.w3.org/TR/WCAG20/#relativeluminancedef
+      if (typeof red === 'undefined') {
+        red = this.red;
+        green = this.green;
+        blue = this.blue;
+      }
+
+      function lum (absValue) {
+        var relValue = absValue / 255;
+        return relValue <= 0.03928 ?
+          relValue / 12.92 : Math.pow(((relValue + 0.055) / 1.055), 2.4);
+      }
+
+      return 0.2126 * lum(red) + 0.7152 * lum(green) + 0.0722 * lum(blue);
+    };
+
+    RGB.prototype.contrast = function (color) {
+      // http://www.w3.org/TR/WCAG20/#contrast-ratiodef
+      var lum1 = this.luminosity(this.red, this.green, this.blue);
+      var lum2 = this.luminosity(color.red, color.green, color.blue);
+      if (lum1 > lum2) {
+         return (lum1 + 0.05) / (lum2 + 0.05)
+      };
+      return (lum2 + 0.05) / (lum1 + 0.05);
+    };
+
     Object.defineProperty(RGB.prototype, 'blue', {
       get: function() {
         return this._blue;
