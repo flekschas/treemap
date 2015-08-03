@@ -43,11 +43,21 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, HEX, D3Colors) {
   this.treeMap.grandParent = this.d3.select('#back');
   this.treeMap.$grandParent = this.$(this.treeMap.grandParent.node());
 
+  /* ---------------------------- [START: STATIC] --------------------------- */
+  // this.d3.json('../data/cl.json', function(error, data) {
+  //   if (error) return console.warn(error);
+  //   this.data = data;
+  //   this.draw();
+  // }.bind(this));
+  /* ----------------------------- [END: STATIC] ---------------------------- */
+
+  /* ----------------------------- [START: LIVE] ---------------------------- */
   neo4jD3.d3
     .then(function (data) {
       this.data = data;
       this.draw();
     }.bind(this));
+  /* ------------------------------ [END: LIVE] ----------------------------- */
 }
 
 /*
