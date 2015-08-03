@@ -92,9 +92,7 @@ function buildTree (results) {
   }
 
   // Deep clone object to be usable by D3
-  var tmp = JSON.parse(JSON.stringify(nodes['owl:Thing']));
-  console.log(tmp);
-  return tmp;
+  return JSON.parse(JSON.stringify(nodes['owl:Thing']));
 }
 
 function Neo4jD3 ($q, Neo4J, settings) {
