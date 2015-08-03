@@ -269,6 +269,11 @@
       fill: #000;
       fill-opacity: 0.5;
     }
+
+    &:hover + text {
+      fill: #fff;
+      fill-opacity: 1;
+    }
   }
 
   .leaf {

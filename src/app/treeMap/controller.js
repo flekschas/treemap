@@ -1,8 +1,9 @@
 /* global angular:false */
 
-function TreeMapCtrl ($element, $, d3, neo4jD3, D3Colors) {
+function TreeMapCtrl ($element, $, d3, neo4jD3, HEX, D3Colors) {
   this.$ = $;
   this.d3 = d3;
+  this.HEX = HEX;
   this.$element = this.$($element),
   this.$d3Element = this.$element.find('.treeMap svg');
 
@@ -299,6 +300,14 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
   return children;
 };
 
+TreeMapCtrl.prototype.addEventListeners = function () {
+  this.$element.on('mouseover', '.outer-border', function () {
+    var $this = $(this);
+
+    console.log('sweet', this, $this.prev().attr('fill'), $this.next().attr('fill'), $this.next().css('fill'));
+  });
+};
+
 /**
  * Add levels of children starting from level `level` until `this.numLevels`.
  *
@@ -373,18 +382,34 @@ TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
  * @return  {String}        HEX color string.
  */
 TreeMapCtrl.prototype.color = function (node) {
+  var hex, rgb;
+
+  if (node.meta.colorHex) {
+    return node.meta.colorHex;
+  }
+
   if (this.colorMode === 'depth') {
     // Color by original depth
     // The deeper the node, the lighter the color
-    return this.treeMap.colors((node.meta.branchNo[0] * this.steps) +
+    hex = this.treeMap.colors((node.meta.branchNo[0] * this.steps) +
       Math.min(this.steps, node.meta.originalDepth) - 1);
+  } else {
+    // Default:
+    // Color by reverse final depth (after pruning). The fewer children a node
+    // has, the lighter the color. E.g. a leaf is lightest while the root is
+    // darkest.
+    hex = this.treeMap.colors((node.meta.branchNo[0] * this.steps) +
+      Math.max(0, this.steps - node.meta.revDepth - 1));
   }
-  // Default:
-  // Color by reverse final depth, i.e. after pruning. The fewer children a node
-  // has, the lighter the color. E.g. a leaf is lightest while the root is
-  // darkest.
-  return this.treeMap.colors((node.meta.branchNo[0] * this.steps) +
-    Math.max(0, this.steps - node.meta.revDepth - 1));
+
+  // Precompute RGB
+  rgb = new this.HEX(hex).toRgb();
+
+  // Cache colors for speed
+  node.meta.colorHex = hex;
+  node.meta.colorRgb = rgb;
+
+  return hex;
 }
 
 /**
@@ -445,6 +470,8 @@ TreeMapCtrl.prototype.draw = function () {
   this.accumulateAndPrune(this.data, 'numDataSets');
   this.layout(this.data, 0);
   this.display(this.data, true);
+
+  this.addEventListeners();
 };
 
 /**
@@ -608,11 +635,20 @@ TreeMapCtrl.prototype.setBreadCrumb = function (node) {
 TreeMapCtrl.prototype.text = function (el) {
   var that = this;
 
-  el.attr("x", function(data) {
+  el.attr('x', function(data) {
       return that.treeMap.x(data.x) + 3;
     })
-    .attr("y", function(data) {
+    .attr('y', function(data) {
       return that.treeMap.y(data.y) + 4;
+    })
+    .attr('fill', function (data) {
+      if (data.meta.colorRgb) {
+        console.log(data.meta.colorRgb);
+        var contrastBlack = data.meta.colorRgb.contrast(new that.HEX('#000000').toRgb()),
+          contrastWhite = data.meta.colorRgb.contrast(new that.HEX('#ffffff').toRgb());
+        return contrastBlack > contrastWhite ? '#000' : '#fff';
+      }
+      return '#000';
     });
 };
 
@@ -760,6 +796,7 @@ angular
     '$',
     'd3',
     'neo4jD3',
+    'HEX',
     'D3Colors',
     TreeMapCtrl
   ]);
