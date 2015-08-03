@@ -38,8 +38,10 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, HEX, D3Colors) {
     .attr('viewBox', '0 0 ' + this.treeMap.width + ' ' + this.treeMap.height)
     .append('g')
       .style('shape-rendering', 'crispEdges');
+  this.treeMap.$element = this.$(this.treeMap.element.node());
 
   this.treeMap.grandParent = this.d3.select('#back');
+  this.treeMap.$grandParent = this.$(this.treeMap.grandParent.node());
 
   neo4jD3.d3
     .then(function (data) {
@@ -227,15 +229,7 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
     childChildNode
       .append('rect')
       .attr('class', 'outer-border')
-      .call(this.rect.bind(this))
-      .on('click', function (data) {
-        /*
-         * that = TreeMapCtrl
-         * this = the clicked DOM element
-         * data = data
-         */
-        that.transition.call(that, this, data);
-      });
+      .call(this.rect.bind(this));
 
     childChildNode
       .append('text')
@@ -301,10 +295,23 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
 };
 
 TreeMapCtrl.prototype.addEventListeners = function () {
-  this.$element.on('mouseover', '.outer-border', function () {
-    var $this = $(this);
+  var that = this;
 
-    console.log('sweet', this, $this.prev().attr('fill'), $this.next().attr('fill'), $this.next().css('fill'));
+  this.treeMap.$grandParent.on('click', 'a', function () {
+    /*
+     * that = TreeMapCtrl
+     * this = the clicked DOM element
+     * data = data
+     */
+    that.transition(this, this.__data__);
+  });
+  this.treeMap.$element.on('click', '.outer-border', function () {
+    /*
+     * that = TreeMapCtrl
+     * this = the clicked DOM element
+     * data = data
+     */
+    that.transition(this, this.__data__);
   });
 };
 
@@ -603,15 +610,7 @@ TreeMapCtrl.prototype.setBreadCrumb = function (node) {
         .insert('li', 'li:first-child')
           .append('a')
             .datum(parent)
-            .text(parent.name)
-            .on('click', function (data) {
-              /*
-               * that = TreeMapCtrl
-               * this = the clicked DOM element
-               * data = data
-               */
-              that.transition(this, data);
-            });
+            .text(parent.name);
 
       node = parent;
       parent = node.parent;
@@ -643,12 +642,25 @@ TreeMapCtrl.prototype.text = function (el) {
     })
     .attr('fill', function (data) {
       if (data.meta.colorRgb) {
-        console.log(data.meta.colorRgb);
         var contrastBlack = data.meta.colorRgb.contrast(new that.HEX('#000000').toRgb()),
           contrastWhite = data.meta.colorRgb.contrast(new that.HEX('#ffffff').toRgb());
         return contrastBlack > contrastWhite ? '#000' : '#fff';
       }
       return '#000';
+    })
+    .attr('transform', function (data) {
+      var containerHeight = that.treeMap.y(data.dy),
+        containerWidth = that.treeMap.x(data.dx),
+        containerRatio = containerWidth / containerHeight,
+        textBbox = this.getBBox();
+
+      // Rotate the text iff text width is bigger than the container's width
+      // AND the ratio is smaller 1, i.e. the container's height is bigger than
+      // its width
+      if (textBbox.width > containerWidth && containerRatio < 1) {
+        var rotPoint = textBbox.height / 2;
+        return 'rotate(90 ' + (that.treeMap.x(data.x) + rotPoint) + ' ' + (that.treeMap.y(data.y) + rotPoint + 3) + ')';
+      }
     });
 };
 
