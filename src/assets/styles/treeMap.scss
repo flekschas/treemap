@@ -201,76 +201,36 @@
 .treeMap svg {
   width: 100%;
   height: 100%;
-}
 
-.treeMap text {
-  pointer-events: none;
-}
-
-.treeMap .inner-border {
-  x: 0;
-  y: 0;
-  width: 100%;
-  height: 100%;
-  fill: #f5f5f5;
-  stroke-width: 10;
-}
-
-.treeMap .grandparent {
-  rect {
-    y: 0;
-    width: 100%;
-    height: 20px;
-    fill: orange;
+  text {
+    pointer-events: none;
   }
 
-  &:hover rect {
-    fill: #ee9700;
+  .inner-border {
+    stroke: #000;
+    stroke-width: 2;
+  }
+
+  .outer-border {
+    fill: transparent;
+    stroke: #fff;
+    stroke-width: 2;
+
+    &:hover {
+      cursor: pointer;
+      fill: #000;
+      fill-opacity: 0.5;
+    }
+  }
+
+  .leaf {
+    stroke: #fff;
+    stroke-width: 2;
   }
 
   text {
-    y: 6;
-    x: 6;
-    font-weight: bold;
+    font-size: 1em;
+    line-height: 1.2em;
+    transform: translate3d(3px, 3px, 0);
   }
-}
-
-.treeMap rect.child,
-.treeMap rect.parent,
-.treeMap .grandparent rect {
-  stroke: #f5f5f5;
-}
-
-.treeMap rect.child {
-  stroke-width: 1;
-}
-
-.treeMap rect.parent,
-.treeMap .grandparent rect {
-  stroke-width: 3;
-}
-
-.treeMap .children rect.parent,
-.treeMap .grandparent rect {
-  cursor: pointer;
-}
-
-.treeMap g > rect.parent {
-  fill: #000;
-  fill-opacity: 0;
-}
-
-.treeMap g:hover > rect.parent {
-  fill-opacity: 0.5;
-}
-
-.treeMap .leaf text,
-.treeMap .children text {
-  font-size: 1em;
-  line-height: 1.2em;
-  transform: translate3d(3px, 3px, 0);
-}
-
-.treeMap .depth {
-  transform: translate3d(0, 20px, 0);
 }
