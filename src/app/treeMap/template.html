@@ -1,11 +1,10 @@
 <div class="treeMapWrapper">
   <div class="top-bar">
-    <p class="left">
-      <a id="back"></a>
-    </p>
+    <ul id="back" class="left no-list-style horizontal-list">
+    </ul>
     <p class="right">
-      Depth:
-      <input type="number" ng-model="treeMap.visibleDepth">
+      <label for="f-visible-depth">Depth:</label>
+      <input id="f-visible-depth" type="number" ng-model="treeMap.visibleDepth">
     </p>
   </div>
   <div class="treeMap">

@@ -281,7 +281,6 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
     animateEls = childrensLeafs;
   }
   if (childChildNode && childChildNode.length) {
-    console.log(leafs, childrensLeafs);
     animateEls[0] = animateEls[0].concat(childChildNode[0]);
   }
 
@@ -370,15 +369,6 @@ TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
 };
 
 /**
- * Set the browsing mode.
- *
- * @param  {String}  mode  Name of the mode.
- */
-TreeMapCtrl.prototype.browseMode = function (mode) {
-  this.mode = mode;
-};
-
-/**
  * Generate a color given an elements node data object.
  *
  * @method  color
@@ -425,18 +415,7 @@ TreeMapCtrl.prototype.colorEl = function (element, attribute) {
 TreeMapCtrl.prototype.display = function (node, firstTime) {
   var that = this;
 
-  // Update the grand parent, which is kind of the "back button"
-  this.treeMap.grandParent
-    .datum(node.parent)
-    .on('click', function (data) {
-      /*
-       * that = TreeMapCtrl
-       * this = the clicked DOM element
-       * data = data
-       */
-      that.transition.call(that, this, data);
-    })
-    .text(this.name(node));
+  this.setBreadCrumb(node);
 
   // Keep a reference to the old wrapper
   this.treeMap.formerGroupWrapper = this.treeMap.groupWrapper;
@@ -577,6 +556,48 @@ TreeMapCtrl.prototype.rect = function (elements, reduction) {
 };
 
 /**
+ * Set breadcrumb navigation from the current `node` to the root.
+ *
+ * @method  setBreadCrumb
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Object}  node  D3 data object.
+ */
+TreeMapCtrl.prototype.setBreadCrumb = function (node) {
+  this.treeMap.grandParent.selectAll('li').remove();
+
+  var parent = node,
+      that = this;
+
+  if (!node.parent) {
+    this.treeMap.grandParent
+      .append('li')
+        .attr('class', 'inactive')
+        .text(node.name);
+  } else {
+    parent = node.parent;
+    while (parent) {
+      this.treeMap.grandParent
+        .insert('li', 'li:first-child')
+          .append('a')
+            .datum(parent)
+            .text(parent.name)
+            .on('click', function (data) {
+              /*
+               * that = TreeMapCtrl
+               * this = the clicked DOM element
+               * data = data
+               */
+              that.transition(this, data);
+            });
+
+      node = parent;
+      parent = node.parent;
+    }
+  }
+};
+
+/**
  * Set the coordinates of the text node.
  *
  * How to invoke:
@@ -584,8 +605,10 @@ TreeMapCtrl.prototype.rect = function (elements, reduction) {
  *
  * Note: See TreeMapCtrl.prototype.rect
  *
- * @param  {[type]} el [description]
- * @return {[type]}    [description]
+ * @method  text
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Object}  el  DOM element
  */
 TreeMapCtrl.prototype.text = function (el) {
   var that = this;
