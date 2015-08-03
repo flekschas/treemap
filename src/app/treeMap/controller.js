@@ -213,11 +213,6 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
     });
 
     childChildNode = childrensChildren
-      .selectAll('.inner-node')
-      .data(function (child) {
-        return data._children;
-      })
-      .enter()
       .append('g')
         .attr('class', 'inner-node')
         .attr('opacity', 0);
