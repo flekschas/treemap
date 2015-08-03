@@ -7,6 +7,13 @@ function TreeMapDivCtrl ($window, $element, $, d3, neo4jD3, D3Colors) {
   this.$element = this.$($element),
   this.$d3Element = this.$element.find('.treeMap');
 
+  /**
+   * Current level of depth. By default starting at the root, e.g. zero.
+   *
+   * @type  {Number}
+   */
+  this.currentDepth = 0;
+
   this._visibleDepth = 3;
 
   this.treeMap.width = this.$d3Element.width();
@@ -33,7 +40,10 @@ function TreeMapDivCtrl ($window, $element, $, d3, neo4jD3, D3Colors) {
     .ratio(this.treeMap.height / this.treeMap.width * 0.5 * (1 + Math.sqrt(5)))
     .round(false);
 
-  this.treeMap.element = this.d3.select(this.$d3Element[0]);
+  this.treeMap.element = this.d3.select(this.$d3Element[0]).append('div')
+    .classed('wrapper', true);
+
+  this.treeMap.$element = $(this.treeMap.element[0]);
 
   this.treeMap.grandparent = this.d3.select('#back');
 
@@ -226,7 +236,7 @@ TreeMapDivCtrl.prototype.addChildren = function (
     })
     .text(function(node) { return node.name; });
 
-  this.nodesAtLevel[level + 1] = [];
+  this.nodesAtLevel[level + 1] = this.nodesAtLevel[level + 1] || [];
 
   nodes.each(function (node) {
 
@@ -268,54 +278,65 @@ TreeMapDivCtrl.prototype.addChildren = function (
 TreeMapDivCtrl.prototype.addClickListener = function () {
   var that = this;
 
-  $(this.treeMap.element).on('click', '.inner-node', function (event) {
-    that.transition(this, d3.select(this).data());
+  $(this.treeMap.element[0]).on('click', '.inner-node.last', function (event) {
+    // D3 hard links data with DOM elements and stores it under the `__data__`
+    // property.
+    that.transition(this, this.__data__);
   });
 };
 
-/**
- * Add levels of children starting from level `level` until `this.numLevels`.
- *
- * @param  {Number}  level  Starting level.
- */
-TreeMapDivCtrl.prototype.addLevels = function (level) {
-  var that = this;
-
-  that.nodesAtLevel[level + 1] = [];
-  for (var i = 0, len = this.nodesAtLevel[level].length; i < len; i++) {
-    this.nodesAtLevel[level][i].each(function (data) {
-      if (data._children && data._children.length) {
-        that.nodesAtLevel[level + 1].push(
-          that.addChildren.call(
-            that, that.d3.select(this), data, level + 1, true)
-        );
-      }
-    });
-  }
-
-  // Check if any children have been added at all.
-  if (!that.nodesAtLevel[level + 1].length) {
-    this.numLevels = level;
-  }
-};
-
 TreeMapDivCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
-  if (oldLevel < newLevel) {
-    this.addLevels(oldLevel);
+  if (oldLevel === newLevel) {
+    return;
   }
-  if (oldLevel > newLevel) {
-    var i, len;
-    // Remove all children deeper than what is specified.
-    for (i = 0, len = this.nodesAtLevel[newLevel + 1].length; i < len; i++) {
-      var group = this.nodesAtLevel[newLevel + 1][i].transition().duration(250);
 
-      // Fade groups out and remove them
-      group
-        .style("opacity", 0)
-        .remove();
-    }
-    for (i = newLevel + 1; i <= oldLevel; i++) {
-      this.nodesAtLevel[i] = undefined;
+  var from, to, i, j, hidden;
+
+  if (oldLevel < newLevel) {
+    from = oldLevel - 1;
+    to = newLevel;
+  } else {
+    // Remove all children deeper than what is specified.
+    hidden = true;
+    from = newLevel - 1;
+    to = oldLevel;
+  }
+
+  for (i = 0, len = this.nodesAtLevel[newLevel].length; i < len; i++) {
+    // Show nodes at current level
+    this.nodesAtLevel[newLevel][i]
+      .classed('last', true)
+      .classed('hidden', false);
+  }
+
+  for (i = 0, len = this.nodesAtLevel[oldLevel].length; i < len; i++) {
+    // Hide nodes at former level
+    this.nodesAtLevel[oldLevel][i]
+      .classed('last', false)
+      .classed('hidden', true);
+  }
+
+
+  // `from` and `to` are included in the loop.
+  while (from++ < to) {
+    for (i = 0, len = this.nodesAtLevel[from].length; i < len; i++) {
+      this.nodesAtLevel[from][i]
+        .style('background-color', function (node) {
+          if (from === newLevel || node.meta.revDepth === 0) {
+            return this.color(node);
+          }
+        }.bind(this))
+        .classed('last', function (node) {
+          if (from === newLevel) {
+            return true;
+          }
+        })
+        .classed('hidden', function (node) {
+          if (hidden && from === newLevel) {
+            return false;
+          }
+          return hidden;
+        });
     }
   }
 };
@@ -542,54 +563,51 @@ TreeMapDivCtrl.prototype.transition = function (el, data) {
 
   this.treeMap.transitioning = true;
 
+  var absX = 0, absY = 0, node = data;
+  while (node.meta.depth > this.currentDepth) {
+    absX += node.x;
+    absY += node.y;
+    node = node.parent;
+  }
+
   // We need to delay the zoom transition to allow the fade-in transition of
   // to fully end. This is solution is not ideal but chaining transitions like
   // described at http://stackoverflow.com/a/17101823/981933 is infeasable
   // since an unknown number of multiple selections has to be transitioned first
-  var newGroups = this.display.call(this, data)
-      .transition().duration(750).delay(250),
-    formerGroupWrapper = this.treeMap.formerGroupWrapper
-      .transition().duration(750).delay(250);
+  var transition = this.treeMap.element.transition().duration(750);
 
   // Update the domain only after entering new elements.
-  this.treeMap.x.domain([data.x, data.x + data.dx]);
-  this.treeMap.y.domain([data.y, data.y + data.dy]);
+  this.treeMap.x.domain([0, data.dx]);
+  this.treeMap.y.domain([0, data.dy]);
 
-  // Enable anti-aliasing during the transition.
-  this.treeMap.element.style("shape-rendering", null);
+  var scaleX = this.treeMap.width / data.dx,
+      scaleY = this.treeMap.height / data.dy,
+      originX = absX + (data.dx / 2),
+      originY = absY + (data.dy / 2),
+      centerAdjustmentX = (this.treeMap.width / 2) - originX,
+      centerAdjustmentY = (this.treeMap.height / 2) - originY;
 
-  // // Draw child nodes on top of parent nodes.
-  // this.treeMap.element
-  //   .selectAll(".depth")
-  //   .sort(function(a, b) {
-  //     return a.depth - b.depth;
+  console.log(
+    'transform-origin: ' + (absX + (data.dx / 2)) + 'px ' + (absY + (data.dy / 2)) + 'px', 'scaleX(' + scaleX +') scaleY(' + scaleY +')',
+    centerAdjustmentX,
+    centerAdjustmentY,
+    'translate3d(-' + absX + 'px, -' + absY + 'px)'
+  );
+
+  this.treeMap.$element
+    .css('transform', 'translate3d(-' + (absX * scaleX) + 'px, -' + (absY * scaleY) + 'px, 0)');
+
+  // this.treeMap.$element
+  //   .css({
+  //     'transformOrigin': originX + 'px ' + originY + 'px',
+  //     'transform': 'translate(' + centerAdjustmentX + 'px, ' + centerAdjustmentY + 'px) scaleX(' + scaleX +') scaleY(' + scaleY +')'
   //   });
 
-  // Fade-in entering text.
-  newGroups.selectAll("text")
-    .style("fill-opacity", 0);
-
-  // Transition to the new view.
-  formerGroupWrapper.selectAll("text")
-    .call(this.text.bind(this))
-    .style("fill-opacity", 0);
-
-  newGroups.selectAll("text")
-    .call(this.text.bind(this))
-    .style("fill-opacity", 1);
-
-  formerGroupWrapper.selectAll("rect")
-    .call(this.rect.bind(this));
-
-  newGroups.selectAll("rect")
-    .call(this.rect.bind(this));
-
-  // Remove the old node when the transition is finished.
-  formerGroupWrapper.remove()
-    .each("end", function() {
-      this.treeMap.element.style("shape-rendering", "crispEdges");
-      this.treeMap.transitioning = false;
-    }.bind(this));
+  this.treeMap.element.selectAll('.node')
+    .style('transition-delay', null)
+    .style('transition-duration', null)
+    .style('transform', 'rotate(0.1deg)')
+    .call(this.coordinates.bind(this));
 };
 
 

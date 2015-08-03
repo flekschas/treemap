@@ -89,11 +89,29 @@
 // DIV
 
 .treeMap.div {
+  overflow: hidden;
+
+  .wrapper {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform-origin: 0 0;
+    transition: transform 5s $easeInOutCubic;
+  }
+
   .node {
     font-size: 1em;
     overflow: hidden;
     position: absolute;
-    transition: all $transitionSemiFast $easeInOutQuadric;
+    transition: opacity   $transitionSemiFast $easeInOutQuadric,
+                transform $transitionSemiFast $easeInOutQuadric,
+                transform $transitionSemiFast $easeInOutQuadric,
+                top 5s $easeInOutCubic,
+                left 5s $easeInOutCubic,
+                width 5s $easeInOutCubic,
+                height 5s $easeInOutCubic;
 
     .name {
       display: none;
@@ -103,6 +121,12 @@
       font-size: 0.8em;
       line-height: 1.25em;
       cursor: default;
+      -webkit-touch-callout: none;
+        -webkit-user-select: none;
+         -khtml-user-select: none;
+           -moz-user-select: none;
+            -ms-user-select: none;
+                user-select: none;
 
       &.rotated {
         height: 1em;
@@ -130,7 +154,6 @@
 
         &:hover {
           cursor: pointer;
-          box-shadow: inset 0 0 0 1px white, inset 0 0 0 3px rgba(0, 0, 0, 1);
 
           &:after {
             position: absolute;
