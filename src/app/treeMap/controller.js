@@ -289,13 +289,13 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
     .transition()
     .duration(function () {
       if (firstTime) {
-        return 1000 + (Math.random() * 500);
+        return 666 + (Math.random() * 333);
       }
-      return 500;
+      return 333;
     })
     .delay(function () {
       if (firstTime) {
-        return Math.random() * 500;
+        return Math.random() * 333;
       }
       return 0;
     })
@@ -659,8 +659,8 @@ TreeMapCtrl.prototype.text = function (el) {
       return '#000';
     })
     .attr('transform', function (data) {
-      var containerHeight = that.treeMap.y(data.dy),
-        containerWidth = that.treeMap.x(data.dx),
+      var containerHeight = that.treeMap.y(data.y + data.dy) - that.treeMap.y(data.y),
+        containerWidth = that.treeMap.x(data.x + data.dx) - that.treeMap.x(data.x),
         containerRatio = containerWidth / containerHeight,
         textBbox = this.getBBox();
 
@@ -692,10 +692,11 @@ TreeMapCtrl.prototype.transition = function (el, data) {
   // to fully end. This is solution is not ideal but chaining transitions like
   // described at http://stackoverflow.com/a/17101823/981933 is infeasable
   // since an unknown number of multiple selections has to be transitioned first
-  var newGroups = this.display.call(this, data)
-      .transition().duration(750).delay(500),
-    formerGroupWrapper = this.treeMap.formerGroupWrapper
-      .transition().duration(750).delay(500);
+  var newGroups = this.display.call(this, data),
+    newGroupsTrans = newGroups.transition().duration(666).delay(333),
+    formerGroupWrapper = this.treeMap.formerGroupWrapper,
+    formerGroupWrapperTrans = formerGroupWrapper
+      .transition().duration(666).delay(333);
 
   // Update the domain only after entering new elements.
   this.treeMap.x.domain([data.x, data.x + data.dx]);
@@ -708,29 +709,24 @@ TreeMapCtrl.prototype.transition = function (el, data) {
   newGroups.selectAll('text')
     .style('fill-opacity', 0);
 
-  // Transition to the new view.
-  formerGroupWrapper.selectAll('text')
-    .call(this.text.bind(this))
-    .style('fill-opacity', 0);
-
-  newGroups.selectAll('text')
-    .call(this.text.bind(this))
-    .style('fill-opacity', 1);
-
-  formerGroupWrapper.selectAll('.inner-border')
+  formerGroupWrapperTrans.selectAll('.inner-border')
     .call(this.rect.bind(this), 1);
 
-  formerGroupWrapper.selectAll('.outer-border, .leaf')
+  formerGroupWrapperTrans.selectAll('.outer-border, .leaf')
     .call(this.rect.bind(this));
 
-  newGroups.selectAll('.inner-border')
+  newGroupsTrans.selectAll('.inner-border')
     .call(this.rect.bind(this), 1);
 
-  newGroups.selectAll('.outer-border, .leaf')
+  newGroupsTrans.selectAll('.outer-border, .leaf')
     .call(this.rect.bind(this));
+
+  newGroupsTrans.selectAll('text')
+    .style('fill-opacity', 1)
+    .call(this.text.bind(this));
 
   // Remove the old node when the transition is finished.
-  formerGroupWrapper.remove()
+  formerGroupWrapperTrans.remove()
     .each('end', function() {
       this.treeMap.element.style('shape-rendering', 'crispEdges');
       this.treeMap.transitioning = false;
