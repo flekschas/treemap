@@ -3,5 +3,7 @@ angular
   .constant('settings', {
     'neo4jUrl': 'http://localhost:7474',
     'neo4jUser': 'neo4j',
-    'neo4jPassword': '123'
+    'neo4jPassword': '123',
+    'treeMapFadeInDuration': 333,
+    'treeMapZoomDuration': 666
   });
