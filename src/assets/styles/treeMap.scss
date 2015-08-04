@@ -294,5 +294,9 @@
     max-height: 2.3em;
     overflow: hidden;
     text-overflow: ellipsis;
+
+    &.label-bright {
+      color: #fff;
+    }
   }
 }

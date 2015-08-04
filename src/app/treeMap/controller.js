@@ -1,5 +1,18 @@
 /* global angular:false */
 
+/**
+ * TreeMap controller constructor.
+ *
+ * @method  TreeMapCtrl
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @param   {[type]}     $element  Directive's root element.
+ * @param   {[type]}     $         jQuery.
+ * @param   {[type]}     d3        D3.
+ * @param   {[type]}     neo4jD3   Neo4J to D3 converter.
+ * @param   {[type]}     HEX       HEX class.
+ * @param   {[type]}     D3Colors  Service for creating D3 color scalings.
+ */
 function TreeMapCtrl ($element, $, d3, neo4jD3, HEX, D3Colors) {
   this.$ = $;
   this.d3 = d3;
@@ -69,8 +82,11 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, HEX, D3Colors) {
 /**
  * Starter function for aggrgation and pruning.
  *
- * @param  {Object} data       D3 data object.
- * @param  {String} valueProp  Name of the property holding the value.
+ * @method  addChildren
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @param   {Object}  data        D3 data object.
+ * @param   {String}  valueProp   Name of the property holding the value.
  */
 TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
   var numChildren = data.children ? data.children.length : false;
@@ -91,11 +107,15 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
    * This function traverses all inner loops and stops one level BEFORE a leaf
    * to be able to splice (delete) empty leafs from the list of children
    *
-   * @param  {Object}   node         D3 data object of the node.
-   * @param  {Number}   numChildren  Number of children of `node.
-   * @param  {String}   valueProp    Property name of the propery holding the value of the node's _size_.
-   * @param  {Number}   depth        Original depth of the current node.
-   * @param  {Boolean}  root         If node is the root.
+   * @method  addChildren
+   * @author  Fritz Lekschas
+   * @date    2015-08-04
+   * @param   {Object}   node         D3 data object of the node.
+   * @param   {Number}   numChildren  Number of children of `node.
+   * @param   {String}   valueProp    Property name of the propery holding the
+   *   value of the node's _size_.
+   * @param   {Number}   depth        Original depth of the current node.
+   * @param   {Boolean}  root         If node is the root.
    */
   function accumulateAndPruneChildren (node, numChildren, valueProp, depth) {
     // A reference for later
@@ -184,10 +204,17 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
 };
 
 /**
- * Recursively add children to the parent until a given threshold.
+ * Recursively adds children to the parent for `this.visibleDepth` levels.
  *
- * @param {[type]} parent [description]
- * @param {[type]} level  [description]
+ * @method  addChildren
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @param   {Object}   parent     D3 selection of parent.
+ * @param   {Object}   data       D3 data object of `parent`.
+ * @param   {Number}   level      Current level of depth.
+ * @param   {Boolean}  firstTime  When `true` triggers a set of initializing
+ *   animation.
+ * @return  {Object}              D3 selection of `parent`'s children.
  */
 TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
   var that = this,
@@ -336,6 +363,8 @@ TreeMapCtrl.prototype.addEventListeners = function () {
  * @param   {String}    attr  Attribute name which holds the label's text.
  */
 TreeMapCtrl.prototype.addLabel = function (el, attr) {
+  var that = this;
+
   el.append('foreignObject')
     .attr('class', 'label-wrapper')
     .call(this.rect.bind(this), 2)
@@ -343,6 +372,13 @@ TreeMapCtrl.prototype.addLabel = function (el, attr) {
       .attr('class', 'label')
       .attr('title', function(data) {
           return data[attr];
+      })
+      .classed('label-bright', function (data) {
+        if (data.meta.colorRgb) {
+          var contrastBlack = data.meta.colorRgb.contrast(new that.HEX('#000000').toRgb()),
+            contrastWhite = data.meta.colorRgb.contrast(new that.HEX('#ffffff').toRgb());
+          return contrastBlack < contrastWhite;
+        }
       })
       .text(function(data) {
           return data[attr];
@@ -352,7 +388,10 @@ TreeMapCtrl.prototype.addLabel = function (el, attr) {
 /**
  * Add levels of children starting from level `level` until `this.numLevels`.
  *
- * @param  {Number}  level  Starting level.
+ * @method  addLevelsOfNodes
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Number}  level  Starting level.
  */
 TreeMapCtrl.prototype.addLevelsOfNodes = function (level) {
   var that = this;
@@ -501,6 +540,10 @@ TreeMapCtrl.prototype.display = function (node, firstTime) {
 
 /**
  * Draw the treemap.
+ *
+ * @method  draw
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
  */
 TreeMapCtrl.prototype.draw = function () {
   if (this.data === null) {
@@ -518,7 +561,10 @@ TreeMapCtrl.prototype.draw = function () {
 /**
  * Initialize the root node. This would usually be computed by `treemap()`.
  *
- * @param  {Object} data  D3 data object.
+ * @method  initialize
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Object}  data  D3 data object.
  */
 TreeMapCtrl.prototype.initialize = function (data) {
   data.x = data.y = 0;
@@ -541,7 +587,10 @@ TreeMapCtrl.prototype.initialize = function (data) {
  * sibling was laid out in 1×1, we must rescale to fit using absolute
  * coordinates. This lets us use a viewport to zoom.
  *
- * @param  {Object}  data  D3 data object.
+ * @method  layout
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Object}  data  D3 data object.
  */
 TreeMapCtrl.prototype.layout = function (parent, depth) {
   // Initialize a cache object used later
@@ -576,16 +625,6 @@ TreeMapCtrl.prototype.layout = function (parent, depth) {
 };
 
 /**
- * Generate the name of the node.
- *
- * @param   {Object}  data  Node's D3 data object.
- * @return  {String}        Name of the node.
- */
-TreeMapCtrl.prototype.name = function (data) {
-    return data.parent ? this.name(data.parent) + "." + data.name : data.name;
-};
-
-/**
  * Set the coordinates of the rectangular.
  *
  * How to invoke:
@@ -598,7 +637,10 @@ TreeMapCtrl.prototype.name = function (data) {
  *
  * URL: https://github.com/mbostock/d3/wiki/Selections#call
  *
- * @param  {Array}  elements  D3 selection of DOM elements.
+ * @method  rect
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Array}  elements  D3 selection of DOM elements.
  */
 TreeMapCtrl.prototype.rect = function (elements, reduction) {
   var that = this;
@@ -613,20 +655,20 @@ TreeMapCtrl.prototype.rect = function (elements, reduction) {
       return that.treeMap.y(data.y) + reduction;
     })
     .attr('width', function (data) {
-      data.cache.width = (
+      data.cache.width = Math.max(0, (
         that.treeMap.x(data.x + data.dx)
         - that.treeMap.x(data.x)
         - (2 * reduction)
-      );
+      ));
 
       return data.cache.width;
     })
     .attr('height', function (data) {
-      data.cache.height = (
+      data.cache.height = Math.max(0, (
         that.treeMap.y(data.y + data.dy)
         - that.treeMap.y(data.y)
         - (2 * reduction)
-      );
+      ));
 
       return data.cache.height;
     });
@@ -667,52 +709,11 @@ TreeMapCtrl.prototype.setBreadCrumb = function (node) {
 };
 
 /**
- * Set the coordinates of the text node.
- *
- * How to invoke:
- * `d3.selectAll('text').call(this.rect.bind(this))`
- *
- * Note: See TreeMapCtrl.prototype.rect
- *
- * @method  text
- * @author  Fritz Lekschas
- * @date    2015-08-03
- * @param   {Object}  el  DOM element
- */
-TreeMapCtrl.prototype.text = function (el) {
-  var that = this;
-
-  el.attr('fill', function (data) {
-      if (data.meta.colorRgb) {
-        var contrastBlack = data.meta.colorRgb.contrast(new that.HEX('#000000').toRgb()),
-          contrastWhite = data.meta.colorRgb.contrast(new that.HEX('#ffffff').toRgb());
-        return contrastBlack > contrastWhite ? '#000' : '#fff';
-      }
-      return '#000';
-    })
-    .attr('transform', function (data) {
-      var containerRatio = data.cache.width / data.cache.height;
-
-      if (!data.cache.textWidth) {
-        data.cache.textWidth = this.getComputedTextLength();
-      }
-
-      // Rotate the text iff text width is bigger than the container's width
-      // AND the ratio is smaller 1, i.e. the container's height is bigger than
-      // its width
-      if (data.cache.textWidth > data.cache.width && containerRatio < 1) {
-        data.cache.textRotation = true;
-        // var rotPoint = data.cache.textBbox.height / 2;
-        return 'rotate(90 ' + (that.treeMap.x(data.x) + 8) + ' ' + (that.treeMap.y(data.y) + 8 + 3) + ')';
-      } else {
-        data.cache.textRotation = false;
-      }
-    });
-};
-
-/**
  * Transition between parent <> child branches of the treemap.
  *
+ * @method  transition
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
  * @param   {Object}  data  D3 data object of the node to transition to.
  */
 TreeMapCtrl.prototype.transition = function (el, data) {
@@ -776,6 +777,13 @@ TreeMapCtrl.prototype.transition = function (el, data) {
  * -----------------------------------------------------------------------------
  */
 
+/**
+ * Holds all nodes per level.
+ *
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @type    {Array}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'children',
@@ -787,16 +795,30 @@ Object.defineProperty(
   }
 );
 
+/**
+ * D3 data object.
+ *
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @type    {Boolean}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'data',
   {
     configurable: false,
     enumerable: true,
-    value: null,
+    value: {},
     writable: true
 });
 
+/**
+ * Depth of the pruned data tree.
+ *
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @type    {Number}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'depth',
@@ -807,16 +829,13 @@ Object.defineProperty(
     writable: true
 });
 
-Object.defineProperty(
-  TreeMapCtrl.prototype,
-  'levels',
-  {
-    configurable: false,
-    enumerable: true,
-    value: [],
-    writable: true
-});
-
+/**
+ * Number of visible levels below the current level.
+ *
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @type    {Number}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'visibleDepth',
@@ -833,6 +852,11 @@ Object.defineProperty(
     }
 });
 
+/**
+ * Object holding the actual D3 treemap and related data.
+ *
+ * @type  {Object}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'treeMap',
