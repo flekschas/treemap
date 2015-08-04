@@ -242,10 +242,7 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
       .call(this.rect.bind(this));
 
     childChildNode
-      .append('text')
-        .attr('dy', '.75em')
-        .text(function(child) { return child.name; })
-        .call(this.text.bind(this));
+      .call(this.addLabel.bind(this), 'name');
   }
 
   // D3 selection of all children without any children, i.e. leafs.
@@ -270,10 +267,7 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
       .call(this.rect.bind(this));
 
   leafs
-    .append('text')
-      .attr('dy', '.75em')
-      .text(function(child) { return child.name; })
-      .call(this.text.bind(this));
+    .call(this.addLabel.bind(this), 'name');
 
   // Merge `leaf` and `childChildNode` selections. This turns out to be
   var animateEls = leafs;
@@ -304,6 +298,13 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
   return children;
 };
 
+/**
+ * Adds global event listeners using jQuery.
+ *
+ * @method  addEventListeners
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ */
 TreeMapCtrl.prototype.addEventListeners = function () {
   var that = this;
 
@@ -323,6 +324,29 @@ TreeMapCtrl.prototype.addEventListeners = function () {
      */
     that.transition(this, this.__data__);
   });
+};
+
+/**
+ * Appends a `foreignObject` into SVG holding a `DIV`
+ *
+ * @method  addLabel
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @param   {Object}    el    D3 selection.
+ * @param   {String}    attr  Attribute name which holds the label's text.
+ */
+TreeMapCtrl.prototype.addLabel = function (el, attr) {
+  el.append('foreignObject')
+    .attr('class', 'label-wrapper')
+    .call(this.rect.bind(this), 2)
+    .append('xhtml:div')
+      .attr('class', 'label')
+      .attr('title', function(data) {
+          return data[attr];
+      })
+      .text(function(data) {
+          return data[attr];
+      });
 };
 
 /**
@@ -520,6 +544,8 @@ TreeMapCtrl.prototype.initialize = function (data) {
  * @param  {Object}  data  D3 data object.
  */
 TreeMapCtrl.prototype.layout = function (parent, depth) {
+  // Initialize a cache object used later
+  parent.cache = {};
   parent.meta.depth = depth;
   if (parent._children && parent._children.length) {
     this.depth = Math.max(this.depth, depth + 1);
@@ -587,10 +613,22 @@ TreeMapCtrl.prototype.rect = function (elements, reduction) {
       return that.treeMap.y(data.y) + reduction;
     })
     .attr('width', function (data) {
-      return that.treeMap.x(data.x + data.dx) - that.treeMap.x(data.x) - (2 * reduction);
+      data.cache.width = (
+        that.treeMap.x(data.x + data.dx)
+        - that.treeMap.x(data.x)
+        - (2 * reduction)
+      );
+
+      return data.cache.width;
     })
     .attr('height', function (data) {
-      return that.treeMap.y(data.y + data.dy) - that.treeMap.y(data.y) - (2 * reduction);
+      data.cache.height = (
+        that.treeMap.y(data.y + data.dy)
+        - that.treeMap.y(data.y)
+        - (2 * reduction)
+      );
+
+      return data.cache.height;
     });
 };
 
@@ -644,13 +682,7 @@ TreeMapCtrl.prototype.setBreadCrumb = function (node) {
 TreeMapCtrl.prototype.text = function (el) {
   var that = this;
 
-  el.attr('x', function(data) {
-      return that.treeMap.x(data.x) + 3;
-    })
-    .attr('y', function(data) {
-      return that.treeMap.y(data.y) + 4;
-    })
-    .attr('fill', function (data) {
+  el.attr('fill', function (data) {
       if (data.meta.colorRgb) {
         var contrastBlack = data.meta.colorRgb.contrast(new that.HEX('#000000').toRgb()),
           contrastWhite = data.meta.colorRgb.contrast(new that.HEX('#ffffff').toRgb());
@@ -659,17 +691,21 @@ TreeMapCtrl.prototype.text = function (el) {
       return '#000';
     })
     .attr('transform', function (data) {
-      var containerHeight = that.treeMap.y(data.y + data.dy) - that.treeMap.y(data.y),
-        containerWidth = that.treeMap.x(data.x + data.dx) - that.treeMap.x(data.x),
-        containerRatio = containerWidth / containerHeight,
-        textBbox = this.getBBox();
+      var containerRatio = data.cache.width / data.cache.height;
+
+      if (!data.cache.textWidth) {
+        data.cache.textWidth = this.getComputedTextLength();
+      }
 
       // Rotate the text iff text width is bigger than the container's width
       // AND the ratio is smaller 1, i.e. the container's height is bigger than
       // its width
-      if (textBbox.width > containerWidth && containerRatio < 1) {
-        var rotPoint = textBbox.height / 2;
-        return 'rotate(90 ' + (that.treeMap.x(data.x) + rotPoint) + ' ' + (that.treeMap.y(data.y) + rotPoint + 3) + ')';
+      if (data.cache.textWidth > data.cache.width && containerRatio < 1) {
+        data.cache.textRotation = true;
+        // var rotPoint = data.cache.textBbox.height / 2;
+        return 'rotate(90 ' + (that.treeMap.x(data.x) + 8) + ' ' + (that.treeMap.y(data.y) + 8 + 3) + ')';
+      } else {
+        data.cache.textRotation = false;
       }
     });
 };
@@ -706,7 +742,7 @@ TreeMapCtrl.prototype.transition = function (el, data) {
   this.treeMap.element.style('shape-rendering', null);
 
   // Fade-in entering text.
-  newGroups.selectAll('text')
+  newGroups.selectAll('.label-wrapper')
     .style('fill-opacity', 0);
 
   formerGroupWrapperTrans.selectAll('.inner-border')
@@ -721,9 +757,9 @@ TreeMapCtrl.prototype.transition = function (el, data) {
   newGroupsTrans.selectAll('.outer-border, .leaf')
     .call(this.rect.bind(this));
 
-  newGroupsTrans.selectAll('text')
+  newGroupsTrans.selectAll('.label-wrapper')
     .style('fill-opacity', 1)
-    .call(this.text.bind(this));
+    .call(this.rect.bind(this), 2);
 
   // Remove the old node when the transition is finished.
   formerGroupWrapperTrans.remove()
