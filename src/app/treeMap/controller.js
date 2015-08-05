@@ -223,6 +223,7 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
 TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
   var that = this,
       childChildNode,
+      defers = [],
       promises = [];
 
   // Create a `g` wrapper for all children.
@@ -240,7 +241,7 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
         var childChildren = that.addChildren(
           that.d3.select(this), data, level + 1, firstTime);
         that.children[level + 1].push(childChildren[0]);
-        promise.push(childChildren[1]);
+        promises.push(childChildren[1]);
       }
     });
   } else {
@@ -315,9 +316,6 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
   var promiseOffset = promises.length;
   animateEls
     .transition()
-    .each('start', function (d, i) {
-      promises[promiseOffset + i] = that.$q.defer();
-    })
     .duration(function () {
       if (firstTime) {
         return that.settings.treeMapFadeInDuration + (Math.random() * that.settings.treeMapFadeInDuration);
@@ -332,10 +330,16 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
     })
     .attr('opacity', 1)
     .each('end', function (d, i) {
-      promises[promiseOffset + i].resolve();
+      defers[i].resolve();
     });
 
-  return [children, $q.all(promises)];
+  animateEls
+    .each(function (d, i) {
+      defers[i] = that.$q.defer();
+      promises[promiseOffset + i] = defers[i].promise;
+    });
+
+  return [children, this.$q.all(promises)];
 };
 
 /**
@@ -413,24 +417,22 @@ TreeMapCtrl.prototype.addLevelsOfNodes = function (level) {
       currentInnerNodes = that.d3.selectAll('.inner-node'),
       promises = [];
 
-  that.children[level + 1] = that.children[level + 1] || [];
+  this.children[level + 1] = this.children[level + 1] || [];
   for (var i = 0, len = this.children[level].length; i < len; i++) {
     this.children[level][i].each(function (data) {
       if (data._children && data._children.length) {
         var children = that.addChildren(that.d3.select(this), data, level + 1);
         that.children[level + 1].push(children[0]);
-        promise.push(children[1]);
+        promises.push(children[1]);
       }
     });
   }
 
-  // Remove formerly displayed inner nodes now.
-  $q.all(promises)
+  // Remove formerly displayed inner nodes after all new inner nodes have been
+  // faded in.
+  this.$q.all(promises)
     .then(function () {
-      console.log('Sweet mama all animations are over.');
-    })
-    .finally(function () {
-      console.log('Something went wrong on the way.');
+      currentInnerNodes.remove();
     });
 
   // Check if any children have been added at all.
@@ -753,49 +755,57 @@ TreeMapCtrl.prototype.transition = function (el, data) {
   // described at http://stackoverflow.com/a/17101823/981933 is infeasable
   // since an unknown number of multiple selections has to be transitioned first
   var newGroups = this.display.call(this, data),
-    newGroupsTrans = newGroups
-      .transition()
-      .duration(this.settings.treeMapZoomDuration)
-      .delay(this.settings.treeMapFadeInDuration),
-    formerGroupWrapper = this.treeMap.formerGroupWrapper,
-    formerGroupWrapperTrans = formerGroupWrapper
-      .transition()
-      .duration(this.settings.treeMapZoomDuration)
-      .delay(this.settings.treeMapFadeInDuration);
+      newGroupsTrans, formerGroupWrapper, formerGroupWrapperTrans;
 
-  // Update the domain only after entering new elements.
-  this.treeMap.x.domain([data.x, data.x + data.dx]);
-  this.treeMap.y.domain([data.y, data.y + data.dy]);
+  newGroups[1]
+    .then(function () {
+      // Fade in animations finished
+      newGroups = newGroups[0];
+      newGroupsTrans = newGroupsTrans = newGroups
+        .transition()
+        .duration(this.settings.treeMapZoomDuration);
+      formerGroupWrapper = this.treeMap.formerGroupWrapper;
+      formerGroupWrapperTrans = formerGroupWrapper
+        .transition()
+        .duration(this.settings.treeMapZoomDuration);
 
-  // Enable anti-aliasing during the transition.
-  this.treeMap.element.style('shape-rendering', null);
+      // Update the domain only after entering new elements.
+      this.treeMap.x.domain([data.x, data.x + data.dx]);
+      this.treeMap.y.domain([data.y, data.y + data.dy]);
 
-  // Fade-in entering text.
-  newGroups.selectAll('.label-wrapper')
-    .style('fill-opacity', 0);
+      // Enable anti-aliasing during the transition.
+      this.treeMap.element.style('shape-rendering', null);
 
-  formerGroupWrapperTrans.selectAll('.inner-border')
-    .call(this.rect.bind(this), 1);
+      // Fade-in entering text.
+      newGroups.selectAll('.label-wrapper')
+        .style('fill-opacity', 0);
 
-  formerGroupWrapperTrans.selectAll('.outer-border, .leaf')
-    .call(this.rect.bind(this));
+      formerGroupWrapperTrans.selectAll('.inner-border')
+        .call(this.rect.bind(this), 1);
 
-  newGroupsTrans.selectAll('.inner-border')
-    .call(this.rect.bind(this), 1);
+      formerGroupWrapperTrans.selectAll('.outer-border, .leaf')
+        .call(this.rect.bind(this));
 
-  newGroupsTrans.selectAll('.outer-border, .leaf')
-    .call(this.rect.bind(this));
+      newGroupsTrans.selectAll('.inner-border')
+        .call(this.rect.bind(this), 1);
 
-  newGroupsTrans.selectAll('.label-wrapper')
-    .style('fill-opacity', 1)
-    .call(this.rect.bind(this), 2);
+      newGroupsTrans.selectAll('.outer-border, .leaf')
+        .call(this.rect.bind(this));
 
-  // Remove the old node when the transition is finished.
-  formerGroupWrapperTrans.remove()
-    .each('end', function() {
-      this.treeMap.element.style('shape-rendering', 'crispEdges');
-      this.treeMap.transitioning = false;
-    }.bind(this));
+      newGroupsTrans.selectAll('.label-wrapper')
+        .style('fill-opacity', 1)
+        .call(this.rect.bind(this), 2);
+
+      // Remove the old node when the transition is finished.
+      formerGroupWrapperTrans.remove()
+        .each('end', function() {
+          this.treeMap.element.style('shape-rendering', 'crispEdges');
+          this.treeMap.transitioning = false;
+        }.bind(this));
+    }.bind(this))
+    .catch(function (e) {
+      console.error(e);
+    });
 };
 
 
