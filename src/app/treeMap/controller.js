@@ -398,19 +398,21 @@ TreeMapCtrl.prototype.addLabel = function (el, attr) {
  * @method  addLevelsOfNodes
  * @author  Fritz Lekschas
  * @date    2015-08-03
- * @param   {Number}  level  Starting level.
+ * @param   {Number}  oldLevel  Starting level.
  */
-TreeMapCtrl.prototype.addLevelsOfNodes = function (level) {
-  var that = this,
-      currentInnerNodes = that.d3.selectAll('.inner-node'),
-      promises = [];
+TreeMapCtrl.prototype.addLevelsOfNodes = function (oldLevel) {
+  var currentInnerNodes = this.d3.selectAll('.inner-node'),
+    promises = [],
+    startLevel = this.currentLevel + oldLevel,
+    that = this;
 
-  this.children[level + 1] = this.children[level + 1] || [];
-  for (var i = 0, len = this.children[level].length; i < len; i++) {
-    this.children[level][i].each(function (data) {
+  this.children[startLevel + 1] = this.children[startLevel + 1] || [];
+  for (var i = 0, len = this.children[startLevel].length; i < len; i++) {
+    this.children[startLevel][i].each(function (data) {
       if (data._children && data._children.length) {
-        var children = that.addChildren(that.d3.select(this), data, level + 1);
-        that.children[level + 1].push(children[0]);
+        var children = that.addChildren(
+          that.d3.select(this), data, startLevel + 1);
+        that.children[startLevel + 1].push(children[0]);
         promises.push(children[1]);
       }
     });
@@ -422,11 +424,6 @@ TreeMapCtrl.prototype.addLevelsOfNodes = function (level) {
     .then(function () {
       currentInnerNodes.remove();
     });
-
-  // Check if any children have been added at all.
-  if (!that.children[level + 1].length) {
-    this.numLevels = level;
-  }
 };
 
 /**
@@ -445,7 +442,7 @@ TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
     this.addLevelsOfNodes(oldLevel);
   }
   if (oldLevel > newLevel) {
-    this.removeLevelsOfNodes(oldLevel, newLevel);
+    this.removeLevelsOfNodes(oldLevel);
   }
 };
 
@@ -722,24 +719,23 @@ TreeMapCtrl.prototype.rect = function (elements, reduction) {
  * @author  Fritz Lekschas
  * @date    2015-08-05
  * @param   {Number}  oldLevel  Former level of depth.
- * @param   {Number}  newLevel  New level of depth.
  */
-TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldLevel, newLevel) {
+TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldLevel) {
     var i,
       len,
-      startLevel = this.currentLevel + this.visibleDepth - 1,
+      startLevel = this.currentLevel + this.visibleDepth,
       that = this;
 
-    // Add inner nodes to `.group-of-nodes` at `newLevel`.
-    for (i = 0, len = this.children[newLevel - 1].length; i < len; i++) {
-      this.children[newLevel - 1][i].each(function (data) {
+    // Add inner nodes to `.group-of-nodes` at `startLevel`.
+    for (i = 0, len = this.children[startLevel].length; i < len; i++) {
+      this.children[startLevel][i].each(function (data) {
         that.fadeIn(that.addInnerNodes(that.d3.select(this)));
       });
     }
 
     // Remove all children deeper than what is specified.
-    for (i = 0, len = this.children[newLevel + 1].length; i < len; i++) {
-      var group = this.children[newLevel + 1][i].transition().duration(250);
+    for (i = 0, len = this.children[startLevel + 1].length; i < len; i++) {
+      var group = this.children[startLevel + 1][i].transition().duration(250);
 
       // Fade groups out and remove them
       group
@@ -747,7 +743,7 @@ TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldLevel, newLevel) {
         .remove();
     }
     // Unset intemediate levels
-    for (i = newLevel + 1; i <= oldLevel; i++) {
+    for (i = startLevel + 1; i <= oldLevel; i++) {
       this.children[i] = undefined;
     }
 };
