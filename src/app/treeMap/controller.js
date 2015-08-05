@@ -1,11 +1,28 @@
 /* global angular:false */
 
-function TreeMapCtrl ($element, $, d3, neo4jD3, HEX, D3Colors) {
+/**
+ * TreeMap controller constructor.
+ *
+ * @method  TreeMapCtrl
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @param   {Object}     $element  Directive's root element.
+ * @param   {Object}     $q        Angular's promise service.
+ * @param   {Object}     $         jQuery.
+ * @param   {Object}     d3        D3.
+ * @param   {Object}     neo4jD3   Neo4J to D3 converter.
+ * @param   {Object}     HEX       HEX class.
+ * @param   {Object}     D3Colors  Service for creating D3 color scalings.
+ * @param   {Object}     settings  App wide this.settings.
+ */
+function TreeMapCtrl ($element, $q, $, d3, neo4jD3, HEX, D3Colors, settings) {
   this.$ = $;
+  this.$q = $q;
   this.d3 = d3;
   this.HEX = HEX;
   this.$element = this.$($element),
   this.$d3Element = this.$element.find('.treeMap svg');
+  this.settings = settings;
 
   this._visibleDepth = 3;
   this.currentLevel = 0;
@@ -69,8 +86,11 @@ function TreeMapCtrl ($element, $, d3, neo4jD3, HEX, D3Colors) {
 /**
  * Starter function for aggrgation and pruning.
  *
- * @param  {Object} data       D3 data object.
- * @param  {String} valueProp  Name of the property holding the value.
+ * @method  addChildren
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @param   {Object}  data        D3 data object.
+ * @param   {String}  valueProp   Name of the property holding the value.
  */
 TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
   var numChildren = data.children ? data.children.length : false;
@@ -91,11 +111,15 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
    * This function traverses all inner loops and stops one level BEFORE a leaf
    * to be able to splice (delete) empty leafs from the list of children
    *
-   * @param  {Object}   node         D3 data object of the node.
-   * @param  {Number}   numChildren  Number of children of `node.
-   * @param  {String}   valueProp    Property name of the propery holding the value of the node's _size_.
-   * @param  {Number}   depth        Original depth of the current node.
-   * @param  {Boolean}  root         If node is the root.
+   * @method  addChildren
+   * @author  Fritz Lekschas
+   * @date    2015-08-04
+   * @param   {Object}   node         D3 data object of the node.
+   * @param   {Number}   numChildren  Number of children of `node.
+   * @param   {String}   valueProp    Property name of the propery holding the
+   *   value of the node's _size_.
+   * @param   {Number}   depth        Original depth of the current node.
+   * @param   {Boolean}  root         If node is the root.
    */
   function accumulateAndPruneChildren (node, numChildren, valueProp, depth) {
     // A reference for later
@@ -184,14 +208,22 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
 };
 
 /**
- * Recursively add children to the parent until a given threshold.
+ * Recursively adds children to the parent for `this.visibleDepth` levels.
  *
- * @param {[type]} parent [description]
- * @param {[type]} level  [description]
+ * @method  addChildren
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @param   {Object}   parent     D3 selection of parent.
+ * @param   {Object}   data       D3 data object of `parent`.
+ * @param   {Number}   level      Current level of depth.
+ * @param   {Boolean}  firstTime  When `true` triggers a set of initializing
+ *   animation.
+ * @return  {Object}              D3 selection of `parent`'s children.
  */
 TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
   var that = this,
-      childChildNode;
+      childChildNode,
+      promises = [];
 
   // Create a `g` wrapper for all children.
   var children = parent.selectAll('.group-of-nodes')
@@ -205,9 +237,10 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
     this.children[level + 1] = this.children[level + 1] || [];
     children.each(function (data) {
       if (data._children && data._children.length) {
-        that.children[level + 1].push(
-          that.addChildren(that.d3.select(this), data, level + 1, firstTime)
-        );
+        var childChildren = that.addChildren(
+          that.d3.select(this), data, level + 1, firstTime);
+        that.children[level + 1].push(childChildren[0]);
+        promises.push(childChildren[1]);
       }
     });
   } else {
@@ -217,35 +250,10 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
      * `this.visibleDepth` this else statement will only be reached when both
      * variables are the same.
      *
-     * On the final level we draw "inner nodes"
+     * On the final level we add "inner nodes"
      */
 
-    // D3 selection of all children with children
-    var childrensChildren = children.filter(function(child) {
-      return child._children && child._children.length;
-    });
-
-    childChildNode = childrensChildren
-      .append('g')
-        .attr('class', 'inner-node')
-        .attr('opacity', 0);
-
-    childChildNode
-      .append('rect')
-        .attr('class', 'inner-border')
-        .attr('fill', this.color.bind(this))
-        .call(this.rect.bind(this), 1);
-
-    childChildNode
-      .append('rect')
-      .attr('class', 'outer-border')
-      .call(this.rect.bind(this));
-
-    childChildNode
-      .append('text')
-        .attr('dy', '.75em')
-        .text(function(child) { return child.name; })
-        .call(this.text.bind(this));
+    childChildNode = this.addInnerNodes(children);
   }
 
   // D3 selection of all children without any children, i.e. leafs.
@@ -270,10 +278,7 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
       .call(this.rect.bind(this));
 
   leafs
-    .append('text')
-      .attr('dy', '.75em')
-      .text(function(child) { return child.name; })
-      .call(this.text.bind(this));
+    .call(this.addLabel.bind(this), 'name');
 
   // Merge `leaf` and `childChildNode` selections. This turns out to be
   var animateEls = leafs;
@@ -284,26 +289,18 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
     animateEls[0] = animateEls[0].concat(childChildNode[0]);
   }
 
-  // Animation
-  animateEls
-    .transition()
-    .duration(function () {
-      if (firstTime) {
-        return 1000 + (Math.random() * 500);
-      }
-      return 500;
-    })
-    .delay(function () {
-      if (firstTime) {
-        return Math.random() * 500;
-      }
-      return 0;
-    })
-    .attr('opacity', 1);
+  promises = promises.concat(this.fadeIn(animateEls, firstTime));
 
-  return children;
+  return [children, this.$q.all(promises)];
 };
 
+/**
+ * Adds global event listeners using jQuery.
+ *
+ * @method  addEventListeners
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ */
 TreeMapCtrl.prototype.addEventListeners = function () {
   var that = this;
 
@@ -315,69 +312,133 @@ TreeMapCtrl.prototype.addEventListeners = function () {
      */
     that.transition(this, this.__data__);
   });
-  this.treeMap.$element.on('click', '.outer-border', function () {
-    /*
-     * that = TreeMapCtrl
-     * this = the clicked DOM element
-     * data = data
-     */
-    that.transition(this, this.__data__);
+  this.treeMap.$element.on(
+    'click',
+    '.label-wrapper, .outer-border',
+    function () {
+      /*
+       * that = TreeMapCtrl
+       * this = the clicked DOM element
+       * data = data
+       */
+      that.transition(this, this.__data__);
+    }
+  );
+};
+
+/**
+ * Add inner nodes
+ *
+ * @method  addInnerNodes
+ * @author  Fritz Lekschas
+ * @date    2015-08-05
+ * @param   {[type]}       parents  [description]
+ */
+TreeMapCtrl.prototype.addInnerNodes = function (parents) {
+  // D3 selection of all children with children
+  var parentsWithChildren = parents.filter(function(parent) {
+    return parent._children && parent._children.length;
   });
+
+  innerNodes = parentsWithChildren
+    .append('g')
+      .attr('class', 'inner-node')
+      .attr('opacity', 0);
+
+  innerNodes
+    .append('rect')
+      .attr('class', 'inner-border')
+      .attr('fill', this.color.bind(this))
+      .call(this.rect.bind(this), 1);
+
+  innerNodes
+    .append('rect')
+    .attr('class', 'outer-border')
+    .call(this.rect.bind(this));
+
+  innerNodes
+    .call(this.addLabel.bind(this), 'name');
+
+  return innerNodes;
+};
+
+/**
+ * Appends a `foreignObject` into SVG holding a `DIV`
+ *
+ * @method  addLabel
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @param   {Object}    el    D3 selection.
+ * @param   {String}    attr  Attribute name which holds the label's text.
+ */
+TreeMapCtrl.prototype.addLabel = function (el, attr) {
+  var that = this;
+
+  el.append('foreignObject')
+    .attr('class', 'label-wrapper')
+    .call(this.rect.bind(this), 2)
+    .append('xhtml:div')
+      .attr('class', 'label')
+      .attr('title', function(data) {
+          return data[attr];
+      })
+      .classed('label-bright', function (data) {
+        if (data.meta.colorRgb) {
+          var contrastBlack = data.meta.colorRgb
+              .contrast(new that.HEX('#000000').toRgb()),
+            contrastWhite = data.meta.colorRgb
+              .contrast(new that.HEX('#ffffff').toRgb());
+          return contrastBlack < contrastWhite;
+        }
+      })
+      .text(function(data) {
+          return data[attr];
+      });
 };
 
 /**
  * Add levels of children starting from level `level` until `this.numLevels`.
  *
- * @param  {Number}  level  Starting level.
+ * @method  addLevelsOfNodes
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Number}  oldLevel  Starting level.
  */
-TreeMapCtrl.prototype.addLevelsOfNodes = function (level) {
-  var that = this;
+TreeMapCtrl.prototype.addLevelsOfNodes = function (oldLevel) {
+  var currentInnerNodes = this.d3.selectAll('.inner-node'),
+    promises = [],
+    startLevel = this.currentLevel + oldLevel,
+    that = this;
 
-  // Remove currently displayed inner nodes first.
-  that.d3.selectAll('.inner-node').remove();
-
-  that.children[level + 1] = that.children[level + 1] || [];
-  for (var i = 0, len = this.children[level].length; i < len; i++) {
-    this.children[level][i].each(function (data) {
+  this.children[startLevel + 1] = this.children[startLevel + 1] || [];
+  for (var i = 0, len = this.children[startLevel].length; i < len; i++) {
+    this.children[startLevel][i].each(function (data) {
       if (data._children && data._children.length) {
-        that.children[level + 1].push(
-          that.addChildren(that.d3.select(this), data, level + 1, true)
-        );
+        var children = that.addChildren(
+          that.d3.select(this), data, startLevel + 1);
+        that.children[startLevel + 1].push(children[0]);
+        promises.push(children[1]);
       }
     });
   }
 
-  // Check if any children have been added at all.
-  if (!that.children[level + 1].length) {
-    this.numLevels = level;
-  }
+  // Remove formerly displayed inner nodes after all new inner nodes have been
+  // faded in.
+  this.$q.all(promises)
+    .then(function () {
+      currentInnerNodes.remove();
+    });
 };
 
-TreeMapCtrl.prototype.removeLevelsOfNodes = function (lastVisibleLevel) {
-    var i, len;
-    // Add inner nodes to `.group-of-nodes` at `newLevel`.
-    for (i = 0, len = this.children[newLevel].length; i < len; i++) {
-      this.children[newLevel][i].each(function (data) {
-        if (data._children && data._children.length) {
-          that.addChildren(that.d3.select(this), data, newLevel, true);
-        }
-      });
-    }
-    // Remove all children deeper than what is specified.
-    for (i = 0, len = this.children[newLevel + 1].length; i < len; i++) {
-      var group = this.children[newLevel + 1][i].transition().duration(250);
-
-      // Fade groups out and remove them
-      group
-        .style("opacity", 0)
-        .remove();
-    }
-    // Unset intemediate levels
-    for (i = newLevel + 1; i <= oldLevel; i++) {
-      this.children[i] = undefined;
-    }
-};
-
+/**
+ * Helper function that decides whether nodes have to be added or removed
+ *
+ * @method  adjustLevelDepth
+ * @author  Fritz Lekschas
+ * @date    2015-08-05
+ * @param   {Number}  oldLevel  Former level of depth.
+ * @param   {Number}  newLevel  New level of depth.
+ */
 TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
   var that = this;
 
@@ -385,7 +446,7 @@ TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
     this.addLevelsOfNodes(oldLevel);
   }
   if (oldLevel > newLevel) {
-    this.removeLevelsOfNodes(newLevel);
+    this.removeLevelsOfNodes(oldLevel);
   }
 };
 
@@ -470,13 +531,17 @@ TreeMapCtrl.prototype.display = function (node, firstTime) {
     this.treeMap.groupWrapper, node, 1, firstTime);
 
   // We have to cache the children to dynamically adjust the level depth.
-  this.children[1] = [children];
+  this.children[1] = [children[0]];
 
   return children;
 };
 
 /**
  * Draw the treemap.
+ *
+ * @method  draw
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
  */
 TreeMapCtrl.prototype.draw = function () {
   if (this.data === null) {
@@ -492,9 +557,56 @@ TreeMapCtrl.prototype.draw = function () {
 };
 
 /**
+ * Fade in a selection.
+ *
+ * @method  fadeIn
+ * @author  Fritz Lekschas
+ * @date    2015-08-05
+ * @param   {Object}   selection  D3 selection.
+ * @param   {Boolean}  firstTime  True if triggered the first time, i.e. after
+ *   the page loaded.
+ * @return  {Array}              Angular promises.
+ */
+TreeMapCtrl.prototype.fadeIn = function (selection, firstTime) {
+  var defers = [],
+      promises = [],
+      that = this;
+
+  selection
+    .each(function (data, index) {
+      defers[index] = that.$q.defer();
+      promises[index] = defers[index].promise;
+    });
+
+  selection
+    .transition()
+    .duration(function () {
+      if (firstTime) {
+        return that.settings.treeMapFadeInDuration + (Math.random() * that.settings.treeMapFadeInDuration);
+      }
+      return that.settings.treeMapFadeInDuration;
+    })
+    .delay(function () {
+      if (firstTime) {
+        return Math.random() * that.settings.treeMapFadeInDuration;
+      }
+      return 0;
+    })
+    .attr('opacity', 1)
+    .each('end', function (data, index) {
+      defers[index].resolve();
+    });
+
+  return promises;
+};
+
+/**
  * Initialize the root node. This would usually be computed by `treemap()`.
  *
- * @param  {Object} data  D3 data object.
+ * @method  initialize
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Object}  data  D3 data object.
  */
 TreeMapCtrl.prototype.initialize = function (data) {
   data.x = data.y = 0;
@@ -517,9 +629,14 @@ TreeMapCtrl.prototype.initialize = function (data) {
  * sibling was laid out in 1×1, we must rescale to fit using absolute
  * coordinates. This lets us use a viewport to zoom.
  *
- * @param  {Object}  data  D3 data object.
+ * @method  layout
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Object}  data  D3 data object.
  */
 TreeMapCtrl.prototype.layout = function (parent, depth) {
+  // Initialize a cache object used later
+  parent.cache = {};
   parent.meta.depth = depth;
   if (parent._children && parent._children.length) {
     this.depth = Math.max(this.depth, depth + 1);
@@ -550,16 +667,6 @@ TreeMapCtrl.prototype.layout = function (parent, depth) {
 };
 
 /**
- * Generate the name of the node.
- *
- * @param   {Object}  data  Node's D3 data object.
- * @return  {String}        Name of the node.
- */
-TreeMapCtrl.prototype.name = function (data) {
-    return data.parent ? this.name(data.parent) + "." + data.name : data.name;
-};
-
-/**
  * Set the coordinates of the rectangular.
  *
  * How to invoke:
@@ -572,7 +679,10 @@ TreeMapCtrl.prototype.name = function (data) {
  *
  * URL: https://github.com/mbostock/d3/wiki/Selections#call
  *
- * @param  {Array}  elements  D3 selection of DOM elements.
+ * @method  rect
+ * @author  Fritz Lekschas
+ * @date    2015-08-03
+ * @param   {Array}  elements  D3 selection of DOM elements.
  */
 TreeMapCtrl.prototype.rect = function (elements, reduction) {
   var that = this;
@@ -587,11 +697,59 @@ TreeMapCtrl.prototype.rect = function (elements, reduction) {
       return that.treeMap.y(data.y) + reduction;
     })
     .attr('width', function (data) {
-      return that.treeMap.x(data.x + data.dx) - that.treeMap.x(data.x) - (2 * reduction);
+      data.cache.width = Math.max(0, (
+        that.treeMap.x(data.x + data.dx)
+        - that.treeMap.x(data.x)
+        - (2 * reduction)
+      ));
+
+      return data.cache.width;
     })
     .attr('height', function (data) {
-      return that.treeMap.y(data.y + data.dy) - that.treeMap.y(data.y) - (2 * reduction);
+      data.cache.height = Math.max(0, (
+        that.treeMap.y(data.y + data.dy)
+        - that.treeMap.y(data.y)
+        - (2 * reduction)
+      ));
+
+      return data.cache.height;
     });
+};
+
+/**
+ * Remove all levels until `newLevel`.
+ *
+ * @method  removeLevelsOfNodes
+ * @author  Fritz Lekschas
+ * @date    2015-08-05
+ * @param   {Number}  oldLevel  Former level of depth.
+ */
+TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldLevel) {
+    var i,
+      len,
+      startLevel = this.currentLevel + this.visibleDepth,
+      that = this;
+
+    // Add inner nodes to `.group-of-nodes` at `startLevel`.
+    for (i = 0, len = this.children[startLevel].length; i < len; i++) {
+      this.children[startLevel][i].each(function (data) {
+        that.fadeIn(that.addInnerNodes(that.d3.select(this)));
+      });
+    }
+
+    // Remove all children deeper than what is specified.
+    for (i = 0, len = this.children[startLevel + 1].length; i < len; i++) {
+      var group = this.children[startLevel + 1][i].transition().duration(250);
+
+      // Fade groups out and remove them
+      group
+        .style('opacity', 0)
+        .remove();
+    }
+    // Unset intemediate levels
+    for (i = startLevel + 1; i <= oldLevel; i++) {
+      this.children[i] = undefined;
+    }
 };
 
 /**
@@ -629,54 +787,11 @@ TreeMapCtrl.prototype.setBreadCrumb = function (node) {
 };
 
 /**
- * Set the coordinates of the text node.
+ * Transition between parent and child branches of the treemap.
  *
- * How to invoke:
- * `d3.selectAll('text').call(this.rect.bind(this))`
- *
- * Note: See TreeMapCtrl.prototype.rect
- *
- * @method  text
+ * @method  transition
  * @author  Fritz Lekschas
  * @date    2015-08-03
- * @param   {Object}  el  DOM element
- */
-TreeMapCtrl.prototype.text = function (el) {
-  var that = this;
-
-  el.attr('x', function(data) {
-      return that.treeMap.x(data.x) + 3;
-    })
-    .attr('y', function(data) {
-      return that.treeMap.y(data.y) + 4;
-    })
-    .attr('fill', function (data) {
-      if (data.meta.colorRgb) {
-        var contrastBlack = data.meta.colorRgb.contrast(new that.HEX('#000000').toRgb()),
-          contrastWhite = data.meta.colorRgb.contrast(new that.HEX('#ffffff').toRgb());
-        return contrastBlack > contrastWhite ? '#000' : '#fff';
-      }
-      return '#000';
-    })
-    .attr('transform', function (data) {
-      var containerHeight = that.treeMap.y(data.dy),
-        containerWidth = that.treeMap.x(data.dx),
-        containerRatio = containerWidth / containerHeight,
-        textBbox = this.getBBox();
-
-      // Rotate the text iff text width is bigger than the container's width
-      // AND the ratio is smaller 1, i.e. the container's height is bigger than
-      // its width
-      if (textBbox.width > containerWidth && containerRatio < 1) {
-        var rotPoint = textBbox.height / 2;
-        return 'rotate(90 ' + (that.treeMap.x(data.x) + rotPoint) + ' ' + (that.treeMap.y(data.y) + rotPoint + 3) + ')';
-      }
-    });
-};
-
-/**
- * Transition between parent <> child branches of the treemap.
- *
  * @param   {Object}  data  D3 data object of the node to transition to.
  */
 TreeMapCtrl.prototype.transition = function (el, data) {
@@ -688,53 +803,63 @@ TreeMapCtrl.prototype.transition = function (el, data) {
 
   this.treeMap.transitioning = true;
 
-  // We need to delay the zoom transition to allow the fade-in transition of
-  // to fully end. This is solution is not ideal but chaining transitions like
-  // described at http://stackoverflow.com/a/17101823/981933 is infeasable
-  // since an unknown number of multiple selections has to be transitioned first
-  var newGroups = this.display.call(this, data)
-      .transition().duration(750).delay(500),
-    formerGroupWrapper = this.treeMap.formerGroupWrapper
-      .transition().duration(750).delay(500);
+  var newGroups = this.display.call(this, data),
+      newGroupsTrans, formerGroupWrapper, formerGroupWrapperTrans;
 
-  // Update the domain only after entering new elements.
-  this.treeMap.x.domain([data.x, data.x + data.dx]);
-  this.treeMap.y.domain([data.y, data.y + data.dy]);
+  // After all newly added inner nodes and leafs have been faded in we call the
+  // zoom transition.
+  newGroups[1]
+    .then(function () {
+      // Fade in animations finished
+      newGroups = newGroups[0];
+      newGroupsTrans = newGroupsTrans = newGroups
+        .transition()
+        .duration(this.settings.treeMapZoomDuration);
+      formerGroupWrapper = this.treeMap.formerGroupWrapper;
+      formerGroupWrapperTrans = formerGroupWrapper
+        .transition()
+        .duration(this.settings.treeMapZoomDuration);
 
-  // Enable anti-aliasing during the transition.
-  this.treeMap.element.style('shape-rendering', null);
+      // Update the domain only after entering new elements.
+      this.treeMap.x.domain([data.x, data.x + data.dx]);
+      this.treeMap.y.domain([data.y, data.y + data.dy]);
 
-  // Fade-in entering text.
-  newGroups.selectAll('text')
-    .style('fill-opacity', 0);
+      // Enable anti-aliasing during the transition.
+      this.treeMap.element.style('shape-rendering', null);
 
-  // Transition to the new view.
-  formerGroupWrapper.selectAll('text')
-    .call(this.text.bind(this))
-    .style('fill-opacity', 0);
+      // Fade-in entering text.
+      newGroups.selectAll('.label-wrapper')
+        .style('fill-opacity', 0);
 
-  newGroups.selectAll('text')
-    .call(this.text.bind(this))
-    .style('fill-opacity', 1);
+      formerGroupWrapperTrans.selectAll('.inner-border')
+        .call(this.rect.bind(this), 1);
 
-  formerGroupWrapper.selectAll('.inner-border')
-    .call(this.rect.bind(this), 1);
+      formerGroupWrapperTrans.selectAll('.outer-border, .leaf')
+        .call(this.rect.bind(this));
 
-  formerGroupWrapper.selectAll('.outer-border, .leaf')
-    .call(this.rect.bind(this));
+      formerGroupWrapperTrans.selectAll('.label-wrapper')
+        .call(this.rect.bind(this), 2);
 
-  newGroups.selectAll('.inner-border')
-    .call(this.rect.bind(this), 1);
+      newGroupsTrans.selectAll('.inner-border')
+        .call(this.rect.bind(this), 1);
 
-  newGroups.selectAll('.outer-border, .leaf')
-    .call(this.rect.bind(this));
+      newGroupsTrans.selectAll('.outer-border, .leaf')
+        .call(this.rect.bind(this));
 
-  // Remove the old node when the transition is finished.
-  formerGroupWrapper.remove()
-    .each('end', function() {
-      this.treeMap.element.style('shape-rendering', 'crispEdges');
-      this.treeMap.transitioning = false;
-    }.bind(this));
+      newGroupsTrans.selectAll('.label-wrapper')
+        .style('fill-opacity', 1)
+        .call(this.rect.bind(this), 2);
+
+      // Remove the old node when the transition is finished.
+      formerGroupWrapperTrans.remove()
+        .each('end', function() {
+          this.treeMap.element.style('shape-rendering', 'crispEdges');
+          this.treeMap.transitioning = false;
+        }.bind(this));
+    }.bind(this))
+    .catch(function (e) {
+      console.error(e);
+    });
 };
 
 
@@ -744,6 +869,13 @@ TreeMapCtrl.prototype.transition = function (el, data) {
  * -----------------------------------------------------------------------------
  */
 
+/**
+ * Holds all nodes per level.
+ *
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @type    {Array}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'children',
@@ -755,16 +887,30 @@ Object.defineProperty(
   }
 );
 
+/**
+ * D3 data object.
+ *
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @type    {Boolean}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'data',
   {
     configurable: false,
     enumerable: true,
-    value: null,
+    value: {},
     writable: true
 });
 
+/**
+ * Depth of the pruned data tree.
+ *
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @type    {Number}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'depth',
@@ -775,16 +921,13 @@ Object.defineProperty(
     writable: true
 });
 
-Object.defineProperty(
-  TreeMapCtrl.prototype,
-  'levels',
-  {
-    configurable: false,
-    enumerable: true,
-    value: [],
-    writable: true
-});
-
+/**
+ * Number of visible levels below the current level.
+ *
+ * @author  Fritz Lekschas
+ * @date    2015-08-04
+ * @type    {Number}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'visibleDepth',
@@ -801,6 +944,11 @@ Object.defineProperty(
     }
 });
 
+/**
+ * Object holding the actual D3 treemap and related data.
+ *
+ * @type  {Object}
+ */
 Object.defineProperty(
   TreeMapCtrl.prototype,
   'treeMap',
@@ -815,10 +963,12 @@ angular
   .module('treeMap')
   .controller('TreeMapCtrl', [
     '$element',
+    '$q',
     '$',
     'd3',
     'neo4jD3',
     'HEX',
     'D3Colors',
+    'settings',
     TreeMapCtrl
   ]);

@@ -38,6 +38,7 @@
   a {
     display: block;
     line-height: 3em;
+    padding: 0 0.25em;
     transition: all $transitionFast $easeInOutCubic;
 
     &:hover {
@@ -263,16 +264,20 @@
     fill: transparent;
     stroke: #fff;
     stroke-width: 2;
+  }
 
+  .inner-node {
     &:hover {
       cursor: pointer;
-      fill: #000;
-      fill-opacity: 0.5;
-    }
 
-    &:hover + text {
-      fill: #fff;
-      fill-opacity: 1;
+      .label {
+        color: #fff;
+      }
+
+      .outer-border {
+        fill: #000;
+        fill-opacity: 0.5;
+      }
     }
   }
 
@@ -281,9 +286,18 @@
     stroke-width: 2;
   }
 
-  text {
-    font-size: 1em;
-    line-height: 1.2em;
-    // transform: translate3d(3px, 3px, 0);
+  .label {
+    font-size: 0.875em;
+    line-height: 1.15em;
+    color: #000;
+    width: 100%;
+    height: 2.3em;
+    max-height: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &.label-bright {
+      color: #fff;
+    }
   }
 }
