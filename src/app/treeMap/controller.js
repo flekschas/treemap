@@ -223,7 +223,6 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
 TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
   var that = this,
       childChildNode,
-      defers = [],
       promises = [];
 
   // Create a `g` wrapper for all children.
@@ -251,32 +250,10 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
      * `this.visibleDepth` this else statement will only be reached when both
      * variables are the same.
      *
-     * On the final level we draw "inner nodes"
+     * On the final level we add "inner nodes"
      */
 
-    // D3 selection of all children with children
-    var childrensChildren = children.filter(function(child) {
-      return child._children && child._children.length;
-    });
-
-    childChildNode = childrensChildren
-      .append('g')
-        .attr('class', 'inner-node')
-        .attr('opacity', 0);
-
-    childChildNode
-      .append('rect')
-        .attr('class', 'inner-border')
-        .attr('fill', this.color.bind(this))
-        .call(this.rect.bind(this), 1);
-
-    childChildNode
-      .append('rect')
-      .attr('class', 'outer-border')
-      .call(this.rect.bind(this));
-
-    childChildNode
-      .call(this.addLabel.bind(this), 'name');
+    childChildNode = this.addInnerNodes(children);
   }
 
   // D3 selection of all children without any children, i.e. leafs.
@@ -312,32 +289,7 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
     animateEls[0] = animateEls[0].concat(childChildNode[0]);
   }
 
-  // Animation
-  var promiseOffset = promises.length;
-  animateEls
-    .transition()
-    .duration(function () {
-      if (firstTime) {
-        return that.settings.treeMapFadeInDuration + (Math.random() * that.settings.treeMapFadeInDuration);
-      }
-      return that.settings.treeMapFadeInDuration;
-    })
-    .delay(function () {
-      if (firstTime) {
-        return Math.random() * that.settings.treeMapFadeInDuration;
-      }
-      return 0;
-    })
-    .attr('opacity', 1)
-    .each('end', function (d, i) {
-      defers[i].resolve();
-    });
-
-  animateEls
-    .each(function (d, i) {
-      defers[i] = that.$q.defer();
-      promises[promiseOffset + i] = defers[i].promise;
-    });
+  promises = promises.concat(this.fadeIn(animateEls, firstTime));
 
   return [children, this.$q.all(promises)];
 };
@@ -368,6 +320,42 @@ TreeMapCtrl.prototype.addEventListeners = function () {
      */
     that.transition(this, this.__data__);
   });
+};
+
+/**
+ * Add inner nodes
+ *
+ * @method  addInnerNodes
+ * @author  Fritz Lekschas
+ * @date    2015-08-05
+ * @param   {[type]}       parents  [description]
+ */
+TreeMapCtrl.prototype.addInnerNodes = function (parents) {
+  // D3 selection of all children with children
+  var parentsWithChildren = parents.filter(function(parent) {
+    return parent._children && parent._children.length;
+  });
+
+  innerNodes = parentsWithChildren
+    .append('g')
+      .attr('class', 'inner-node')
+      .attr('opacity', 0);
+
+  innerNodes
+    .append('rect')
+      .attr('class', 'inner-border')
+      .attr('fill', this.color.bind(this))
+      .call(this.rect.bind(this), 1);
+
+  innerNodes
+    .append('rect')
+    .attr('class', 'outer-border')
+    .call(this.rect.bind(this));
+
+  innerNodes
+    .call(this.addLabel.bind(this), 'name');
+
+  return innerNodes;
 };
 
 /**
@@ -441,31 +429,15 @@ TreeMapCtrl.prototype.addLevelsOfNodes = function (level) {
   }
 };
 
-TreeMapCtrl.prototype.removeLevelsOfNodes = function (lastVisibleLevel) {
-    var i, len;
-    // Add inner nodes to `.group-of-nodes` at `newLevel`.
-    for (i = 0, len = this.children[newLevel].length; i < len; i++) {
-      this.children[newLevel][i].each(function (data) {
-        if (data._children && data._children.length) {
-          that.addChildren(that.d3.select(this), data, newLevel, true);
-        }
-      });
-    }
-    // Remove all children deeper than what is specified.
-    for (i = 0, len = this.children[newLevel + 1].length; i < len; i++) {
-      var group = this.children[newLevel + 1][i].transition().duration(250);
-
-      // Fade groups out and remove them
-      group
-        .style("opacity", 0)
-        .remove();
-    }
-    // Unset intemediate levels
-    for (i = newLevel + 1; i <= oldLevel; i++) {
-      this.children[i] = undefined;
-    }
-};
-
+/**
+ * Helper function that decides whether nodes have to be added or removed
+ *
+ * @method  adjustLevelDepth
+ * @author  Fritz Lekschas
+ * @date    2015-08-05
+ * @param   {Number}  oldLevel  Former level of depth.
+ * @param   {Number}  newLevel  New level of depth.
+ */
 TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
   var that = this;
 
@@ -473,7 +445,7 @@ TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
     this.addLevelsOfNodes(oldLevel);
   }
   if (oldLevel > newLevel) {
-    this.removeLevelsOfNodes(newLevel);
+    this.removeLevelsOfNodes(oldLevel, newLevel);
   }
 };
 
@@ -581,6 +553,50 @@ TreeMapCtrl.prototype.draw = function () {
   this.display(this.data, true);
 
   this.addEventListeners();
+};
+
+/**
+ * Fade in a selection.
+ *
+ * @method  fadeIn
+ * @author  Fritz Lekschas
+ * @date    2015-08-05
+ * @param   {Object}   selection  D3 selection.
+ * @param   {Boolean}  firstTime  True if triggered the first time, i.e. after
+ *   the page loaded.
+ * @return  {Array}              Angular promises.
+ */
+TreeMapCtrl.prototype.fadeIn = function (selection, firstTime) {
+  var defers = [],
+      promises = [],
+      that = this;
+
+  selection
+    .each(function (data, index) {
+      defers[index] = that.$q.defer();
+      promises[index] = defers[index].promise;
+    });
+
+  selection
+    .transition()
+    .duration(function () {
+      if (firstTime) {
+        return that.settings.treeMapFadeInDuration + (Math.random() * that.settings.treeMapFadeInDuration);
+      }
+      return that.settings.treeMapFadeInDuration;
+    })
+    .delay(function () {
+      if (firstTime) {
+        return Math.random() * that.settings.treeMapFadeInDuration;
+      }
+      return 0;
+    })
+    .attr('opacity', 1)
+    .each('end', function (data, index) {
+      defers[index].resolve();
+    });
+
+  return promises;
 };
 
 /**
@@ -700,6 +716,43 @@ TreeMapCtrl.prototype.rect = function (elements, reduction) {
 };
 
 /**
+ * Remove all levels until `newLevel`.
+ *
+ * @method  removeLevelsOfNodes
+ * @author  Fritz Lekschas
+ * @date    2015-08-05
+ * @param   {Number}  oldLevel  Former level of depth.
+ * @param   {Number}  newLevel  New level of depth.
+ */
+TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldLevel, newLevel) {
+    var i,
+      len,
+      startLevel = this.currentLevel + this.visibleDepth - 1,
+      that = this;
+
+    // Add inner nodes to `.group-of-nodes` at `newLevel`.
+    for (i = 0, len = this.children[newLevel - 1].length; i < len; i++) {
+      this.children[newLevel - 1][i].each(function (data) {
+        that.fadeIn(that.addInnerNodes(that.d3.select(this)));
+      });
+    }
+
+    // Remove all children deeper than what is specified.
+    for (i = 0, len = this.children[newLevel + 1].length; i < len; i++) {
+      var group = this.children[newLevel + 1][i].transition().duration(250);
+
+      // Fade groups out and remove them
+      group
+        .style('opacity', 0)
+        .remove();
+    }
+    // Unset intemediate levels
+    for (i = newLevel + 1; i <= oldLevel; i++) {
+      this.children[i] = undefined;
+    }
+};
+
+/**
  * Set breadcrumb navigation from the current `node` to the root.
  *
  * @method  setBreadCrumb
@@ -734,7 +787,7 @@ TreeMapCtrl.prototype.setBreadCrumb = function (node) {
 };
 
 /**
- * Transition between parent <> child branches of the treemap.
+ * Transition between parent and child branches of the treemap.
  *
  * @method  transition
  * @author  Fritz Lekschas
@@ -750,13 +803,11 @@ TreeMapCtrl.prototype.transition = function (el, data) {
 
   this.treeMap.transitioning = true;
 
-  // We need to delay the zoom transition to allow the fade-in transition of
-  // to fully end. This is solution is not ideal but chaining transitions like
-  // described at http://stackoverflow.com/a/17101823/981933 is infeasable
-  // since an unknown number of multiple selections has to be transitioned first
   var newGroups = this.display.call(this, data),
       newGroupsTrans, formerGroupWrapper, formerGroupWrapperTrans;
 
+  // After all newly added inner nodes and leafs have been faded in we call the
+  // zoom transition.
   newGroups[1]
     .then(function () {
       // Fade in animations finished
