@@ -312,14 +312,18 @@ TreeMapCtrl.prototype.addEventListeners = function () {
      */
     that.transition(this, this.__data__);
   });
-  this.treeMap.$element.on('click', '.outer-border', function () {
-    /*
-     * that = TreeMapCtrl
-     * this = the clicked DOM element
-     * data = data
-     */
-    that.transition(this, this.__data__);
-  });
+  this.treeMap.$element.on(
+    'click',
+    '.label-wrapper, .outer-border',
+    function () {
+      /*
+       * that = TreeMapCtrl
+       * this = the clicked DOM element
+       * data = data
+       */
+      that.transition(this, this.__data__);
+    }
+  );
 };
 
 /**
