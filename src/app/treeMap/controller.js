@@ -833,6 +833,9 @@ TreeMapCtrl.prototype.transition = function (el, data) {
       formerGroupWrapperTrans.selectAll('.outer-border, .leaf')
         .call(this.rect.bind(this));
 
+      formerGroupWrapperTrans.selectAll('.label-wrapper')
+        .call(this.rect.bind(this), 2);
+
       newGroupsTrans.selectAll('.inner-border')
         .call(this.rect.bind(this), 1);
 
