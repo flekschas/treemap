@@ -1,0 +1,39 @@
+{
+  "browsers": [
+    "> 1%",
+    "last 2 versions",
+    "Firefox ESR",
+    "Opera 12.1",
+    "Explorer >= 8",
+    "Firefox >= 3.6"
+  ],
+  "globalPaths": {
+    "src": "src",
+    "dev": "dev",
+    "dist": "dist"
+  },
+  "server": {
+    "host": "localhost",
+    "port": "8001"
+  },
+  "sourcePaths": {
+    "assets": "/assets",
+    "styles": [
+        "/assets/styles"
+      ],
+    "jsSource": [
+      "/app",
+      "/common"
+    ]
+  },
+  "vendorPaths": [
+    "custom_components/raf.js",
+    "custom_components/rnaf.js",
+    "bower_components/angular/angular.js",
+    "bower_components/angular-resource/angular-resource.js",
+    "bower_components/angular-ui-router/release/angular-ui-router.js",
+    "bower_components/d3/d3.js",
+    "bower_components/lodash/lodash.js",
+    "bower_components/jquery/dist/jquery.js"
+  ]
+}
