@@ -189,7 +189,6 @@ gulp.task('open', function() {
  */
 
 gulp.task('watch', function() {
-  livereload.listen();
   gulp.watch(config.globalPaths.src + '/index.html', ['index']);
   gulp.watch([
       config.globalPaths.src + '/app/**/*.html',
