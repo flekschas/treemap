@@ -8,9 +8,10 @@
     "Firefox >= 3.6"
   ],
   "globalPaths": {
-    "src": "src",
+    "data": "data",
     "dev": "dev",
-    "dist": "dist"
+    "dist": "dist",
+    "src": "src"
   },
   "server": {
     "host": "localhost",

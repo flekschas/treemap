@@ -45,6 +45,15 @@ gulp.task('clean', function () {
     .pipe(clean());
 });
 
+gulp.task('data', function () {
+  if (production) {
+    return gulp
+      .src(config.globalPaths.data + '/*.json')
+      .pipe(gulp.dest(config.globalPaths.dist + '/data'));
+  }
+  return gulp;
+});
+
 gulp.task('templates', function () {
   var dest = production ?
     config.globalPaths.dist : config.globalPaths.dev;
@@ -206,7 +215,7 @@ gulp.task('build', function(callback) {
   runSequence(
     'clean',
     [
-      'index', 'sass', 'jsSource', 'jsVendor', 'templates'
+      'index', 'sass', 'jsSource', 'jsVendor', 'templates', 'data'
     ],
     callback
   );
