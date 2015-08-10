@@ -69,7 +69,8 @@ function TreeMapCtrl ($element, $q, $, d3, neo4jD3, HEX, D3Colors, settings) {
   /* ----------------------------- [END: STATIC] ---------------------------- */
 
   /* ----------------------------- [START: LIVE] ---------------------------- */
-  neo4jD3.d3
+  neo4jD3
+    .get()
     .then(function (data) {
       this.data = data;
       this.draw();

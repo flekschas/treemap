@@ -3,14 +3,21 @@ var concat        = require('gulp-concat');
 var gulp          = require('gulp');
 var gulpUtil      = require('gulp-util');
 var opn           = require('opn');
-var plumber       = require('gulp-plumber');
-var rename        = require("gulp-rename");
+var rename        = require('gulp-rename');
 var runSequence   = require('run-sequence');
 var sass          = require('gulp-sass');
 var spawn         = require('child_process').spawn;
 var templateCache = require('gulp-angular-templatecache');
 var webserver     = require('gulp-webserver');
 var wrap          = require('gulp-wrap');
+var gulpIf        = require('gulp-if');
+var minifyCss     = require('gulp-minify-css');
+var uglify        = require('gulp-uglify');
+var sourcemaps    = require('gulp-sourcemaps');
+var autoprefixer  = require('gulp-autoprefixer');
+
+// Flags
+var production    = gulpUtil.env.production;  // E.g. `--production`
 
 
 /*
@@ -20,45 +27,7 @@ var wrap          = require('gulp-wrap');
  */
 
 var openBrowser   = gulpUtil.env.open;
-
-
-/*
- * -----------------------------------------------------------------------------
- * Config
- * -----------------------------------------------------------------------------
- */
-
-var sourcePaths = {
-  assets: '/assets',
-  styles: [
-    '/assets/styles'
-  ],
-  jsSource: [
-    '/app',
-    '/common'
-  ]
-};
-
-var vendorPaths = [
-  'custom_components/raf.js',
-  'custom_components/rnaf.js',
-  'bower_components/angular/angular.js',
-  'bower_components/angular-resource/angular-resource.js',
-  'bower_components/angular-ui-router/release/angular-ui-router.js',
-  'bower_components/d3/d3.js',
-  'bower_components/lodash/lodash.js',
-  'bower_components/jquery/dist/jquery.js',
-];
-
-var globalPaths = {
-  src: 'src',
-  dist: 'dist'
-};
-
-var server = {
-  host: 'localhost',
-  port: '8001'
-};
+var config        = require('./config.json');
 
 
 /*
@@ -68,72 +37,157 @@ var server = {
  */
 
 gulp.task('clean', function () {
+  var dest = production ?
+    config.globalPaths.dist : config.globalPaths.dev;
+
   return gulp
-    .src(globalPaths.dist, {read: false})
+    .src(dest, {read: false})
     .pipe(clean());
 });
 
+gulp.task('data', function () {
+  if (production) {
+    return gulp
+      .src(config.globalPaths.data + '/*.json')
+      .pipe(gulp.dest(config.globalPaths.dist + '/data'));
+  }
+  return gulp;
+});
+
 gulp.task('templates', function () {
+  var dest = production ?
+    config.globalPaths.dist : config.globalPaths.dev;
+
   return gulp
     .src([
-      globalPaths.src + '/app/**/*.html',
-      globalPaths.src + '/common/**/*.html',
+      config.globalPaths.src + '/app/**/*.html',
+      config.globalPaths.src + '/common/**/*.html',
     ])
     .pipe(templateCache({
       standalone: true
     }))
-    .pipe(gulp.dest(globalPaths.dist + sourcePaths.assets));
+    .pipe(gulp.dest(dest + config.sourcePaths.assets));
 });
 
 gulp.task('index', function () {
+  var dest = production ?
+    config.globalPaths.dist : config.globalPaths.dev;
+
   return gulp
-    .src(globalPaths.src + '/index.html')
-    .pipe(plumber())
-    .pipe(gulp.dest(globalPaths.dist));
+    .src(config.globalPaths.src + '/index.html')
+    .pipe(gulp.dest(dest));
 });
 
 gulp.task('sass', function () {
+  var dest = production ?
+    config.globalPaths.dist : config.globalPaths.dev;
+
   return gulp
-    .src(globalPaths.src + sourcePaths.styles + '/styles.scss')
-    .pipe(plumber())
+    .src(config.globalPaths.src + config.sourcePaths.styles + '/styles.scss')
+    .pipe(sourcemaps.init())
     .pipe(sass().on('error', sass.logError))
-    .pipe(gulp.dest(globalPaths.dist + sourcePaths.assets));
+    // Add vendor prefixes in production mode
+    .pipe(
+      gulpIf(
+        production,
+        autoprefixer({
+          browsers: config.browsers,
+          cascade: true
+        })
+      )
+    )
+    // Minify stylesheet in production mode
+    .pipe(
+      gulpIf(
+        production,
+        minifyCss()
+      )
+    )
+    // Write sourcemap
+    .pipe(
+      gulpIf(
+        production,
+        sourcemaps.write('.')
+      )
+    )
+    .pipe(gulp.dest(dest + config.sourcePaths.assets));
 });
 
 gulp.task('jsSource', function () {
+  var dest = production ?
+    config.globalPaths.dist : config.globalPaths.dev;
+
   return gulp
     .src([
-      globalPaths.src + '/**/*module.js',
-      globalPaths.src + '/**/!(*module).js'
+      config.globalPaths.src + '/**/*module.js',
+      config.globalPaths.src + '/**/!(*module).js'
     ])
-    .pipe(plumber())
-    .pipe(wrap('// <%= file.path %>\n<%= contents %>\n\n'))
+    // Init source map
+    .pipe(sourcemaps.init())
+    .pipe(wrap('// FILE: <%= file.path %>\n<%= contents %>\n\n'))
     .pipe(concat('app.js'))
-    .pipe(gulp.dest(globalPaths.dist + sourcePaths.assets));
+    // Unglify JavaScript if we start Gulp in production mode. Otherwise
+    // concat files only.
+    .pipe(
+      gulpIf(
+        production,
+        uglify()
+      )
+    )
+    // Append hash to file name in production mode for better cache control
+    .pipe(
+      gulpIf(
+        production,
+        sourcemaps.write('.')
+      )
+    )
+    .pipe(gulp.dest(dest + config.sourcePaths.assets));
 });
 
 gulp.task('jsVendor', function () {
+  var dest = production ?
+    config.globalPaths.dist : config.globalPaths.dev;
+
   return gulp
-    .src(vendorPaths)
-    .pipe(plumber())
-    .pipe(wrap('// <%= file.path %>\n<%= contents %>\n\n'))
+    .src(config.vendorPaths)
+    // Init source map
+    .pipe(sourcemaps.init())
+    .pipe(wrap('// FILE: <%= file.path %>\n<%= contents %>\n\n'))
     .pipe(concat('vendor.js'))
-    .pipe(gulp.dest(globalPaths.dist + sourcePaths.assets));
+    // Unglify JavaScript if we start Gulp in production mode. Otherwise
+    // concat files only.
+    .pipe(
+      gulpIf(
+        production,
+        uglify()
+      )
+    )
+    // Append hash to file name in production mode for better cache control
+    .pipe(
+      gulpIf(
+        production,
+        sourcemaps.write('.')
+      )
+    )
+    .pipe(gulp.dest(dest + config.sourcePaths.assets));
 });
 
 gulp.task('webserver', function() {
   gulp.src( '.' )
     .pipe(webserver({
-      host:             server.host,
-      port:             server.port,
+      host:             config.server.host,
+      port:             config.server.port,
       livereload:       true,
       directoryListing: false
     }));
 });
 
 gulp.task('open', function() {
+  var dest = production ?
+    config.globalPaths.dist : config.globalPaths.dev;
+
   if (openBrowser) {
-    opn('http://' + server.host + ':' + server.port + '/dist');
+    opn('http://' + config.server.host + ':' + config.server.port + '/' + dest);
   }
 });
 
@@ -144,23 +198,35 @@ gulp.task('open', function() {
  */
 
 gulp.task('watch', function() {
-  gulp.watch(globalPaths.src + '/index.html', ['index']);
+  gulp.watch(config.globalPaths.src + '/index.html', ['index']);
   gulp.watch([
-      globalPaths.src + '/app/**/*.html',
-      globalPaths.src + '/common/**/*.html',
+      config.globalPaths.src + '/app/**/*.html',
+      config.globalPaths.src + '/common/**/*.html',
     ], ['templates']);
-  gulp.watch(globalPaths.src + sourcePaths.styles + '/**/*.scss', ['sass']);
-  gulp.watch(globalPaths.src + '/**/*.js', ['jsSource']);
-  gulp.watch(vendorPaths, ['jsVendor']);
+  gulp.watch(
+    config.globalPaths.src +
+    config.sourcePaths.styles +
+    '/**/*.scss', ['sass']);
+  gulp.watch(config.globalPaths.src + '/**/*.js', ['jsSource']);
+  gulp.watch(config.vendorPaths, ['jsVendor']);
 });
 
 gulp.task('build', function(callback) {
   runSequence(
     'clean',
     [
-      'index', 'sass', 'jsSource', 'jsVendor', 'templates'
+      'index', 'sass', 'jsSource', 'jsVendor', 'templates', 'data'
     ],
-    callback);
+    callback
+  );
 });
 
-gulp.task('default', ['build', 'webserver', 'watch', 'open']);
+gulp.task('default', function(callback) {
+  runSequence(
+    [
+      'build', 'webserver', 'watch'
+    ],
+    'open',
+    callback
+  );
+});

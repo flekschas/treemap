@@ -96,14 +96,21 @@ function buildTree (results) {
 }
 
 function Neo4jD3 ($q, Neo4J, settings) {
-  // Private
-  var d3Deferred = $q.defer();
-
+  this.$q = $q;
   this.Neo4J = new Neo4J(
     settings.neo4jUrl,
     settings.neo4jUser,
     settings.neo4jPassword
   );
+}
+
+Neo4jD3.prototype.get = function () {
+  if (this.d3 && typeof this.d3.value === 'function') {
+    return this.d3;
+  }
+
+  // Private
+  var d3Deferred = this.$q.defer();
 
   this.Neo4J.query({
       statements: [{
@@ -135,7 +142,7 @@ function Neo4jD3 ($q, Neo4J, settings) {
     });
 
   this.d3 = d3Deferred.promise;
-}
+};
 
 Object.defineProperty(
   Neo4jD3.prototype,

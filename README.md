@@ -1,5 +1,7 @@
 # D3-driven AngularJS treemap app
 
+See the treemap in action: [flekschas.github.io/treemap](https://flekschas.github.io/treemap/)
+
 ## Requirements
 
 - git
