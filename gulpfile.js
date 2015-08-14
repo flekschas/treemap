@@ -54,6 +54,16 @@ gulp.task('data', function () {
   return gulp;
 });
 
+
+gulp.task('images', function () {
+  var dest = production ?
+    config.globalPaths.dist : config.globalPaths.dev;
+
+  return gulp
+    .src(config.globalPaths.src + '/assets/images/**/*')
+    .pipe(gulp.dest(dest + '/assets/images'));
+});
+
 gulp.task('templates', function () {
   var dest = production ?
     config.globalPaths.dist : config.globalPaths.dev;
@@ -215,7 +225,7 @@ gulp.task('build', function(callback) {
   runSequence(
     'clean',
     [
-      'index', 'sass', 'jsSource', 'jsVendor', 'templates', 'data'
+      'index', 'sass', 'jsSource', 'jsVendor', 'templates', 'data', 'images'
     ],
     callback
   );
