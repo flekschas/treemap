@@ -1,3 +1,7 @@
+.is-mirrord {
+  transform: scale(-1, 1);
+}
+
 .no-list-style {
   margin: 0;
   padding: 0;
@@ -27,11 +31,37 @@
   margin-left: 0.5em;
 
   li {
+    position: relative;
     line-height: 3em;
-    margin-left: 0.5em;
+    margin-left: 0.25em;
 
     &:first-child {
       margin-left: 0;
+    }
+  }
+
+  svg {
+    position: relative;
+    display: inline-block;
+    top: 0;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.25em;
+  }
+
+  .text {
+    display: inline-block;
+    line-height: 2em;
+  }
+
+  .current-root {
+
+    .text {
+      padding: 0 0.5em;
+      color: #000;
+      font-weight: bold;
+      border-radius: 0.25em;
+      background: #efefef;
     }
   }
 
@@ -52,11 +82,6 @@
       background: rgba(255, 247, 217, 1);
       box-shadow: 0 1px 0 0 rgba(255, 150, 0, 1), inset 0 -2px 0 0 rgba(255, 150, 0, 1);
     }
-  }
-
-  .inactive {
-    color: #888;
-    font-style: italic;
   }
 }
 
@@ -272,11 +297,14 @@
 
       .label {
         color: #fff;
+
+        span {
+          background: rgba(0, 0, 0, 0.66);
+        }
       }
 
-      .outer-border {
-        fill: #000;
-        fill-opacity: 0.5;
+      .inner-border {
+        stroke-width: 4;
       }
     }
   }
@@ -298,6 +326,12 @@
 
     &.label-bright {
       color: #fff;
+    }
+
+    span {
+      display: inline-block;
+      padding: 0.1em 0.25em 0.1em 0.1em;
+      border-radius: 0 0 0.25em 0;
     }
   }
 }
