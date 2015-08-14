@@ -62,7 +62,7 @@ function TreeMapCtrl ($element, $q, $, d3, neo4jD3, HEX, D3Colors, settings) {
   this.treeMap.$grandParent = this.$(this.treeMap.grandParent.node());
 
   /* ---------------------------- [START: STATIC] --------------------------- */
-  this.d3.json('../data/cl.json', function(error, data) {
+  this.d3.json('data/cl.json', function(error, data) {
     if (error) return console.warn(error);
     this.data = data;
     this.draw();

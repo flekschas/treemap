@@ -15,6 +15,7 @@ var minifyCss     = require('gulp-minify-css');
 var uglify        = require('gulp-uglify');
 var sourcemaps    = require('gulp-sourcemaps');
 var autoprefixer  = require('gulp-autoprefixer');
+var changed       = require('gulp-changed');
 
 // Flags
 var production    = gulpUtil.env.production;  // E.g. `--production`
@@ -46,12 +47,13 @@ gulp.task('clean', function () {
 });
 
 gulp.task('data', function () {
-  if (production) {
-    return gulp
-      .src(config.globalPaths.data + '/*.json')
-      .pipe(gulp.dest(config.globalPaths.dist + '/data'));
-  }
-  return gulp;
+  var dest = production ?
+    config.globalPaths.dist : config.globalPaths.dev;
+
+  return gulp
+    .src(config.globalPaths.data + '/*.json')
+    .pipe(changed(dest + '/data'))
+    .pipe(gulp.dest(dest + '/data'));
 });
 
 
