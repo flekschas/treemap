@@ -297,11 +297,14 @@
 
       .label {
         color: #fff;
+
+        span {
+          background: rgba(0, 0, 0, 0.66);
+        }
       }
 
-      .outer-border {
-        fill: #000;
-        fill-opacity: 0.5;
+      .inner-border {
+        stroke-width: 4;
       }
     }
   }
@@ -323,6 +326,12 @@
 
     &.label-bright {
       color: #fff;
+    }
+
+    span {
+      display: inline-block;
+      padding: 0.1em 0.25em 0.1em 0.1em;
+      border-radius: 0 0 0.25em 0;
     }
   }
 }

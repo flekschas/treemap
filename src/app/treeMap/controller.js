@@ -392,9 +392,10 @@ TreeMapCtrl.prototype.addLabel = function (el, attr) {
           return contrastBlack < contrastWhite;
         }
       })
-      .text(function(data) {
-          return data[attr];
-      });
+      .append('xhtml:span')
+        .text(function(data) {
+            return data[attr];
+        });
 };
 
 /**
