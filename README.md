@@ -24,7 +24,7 @@ See the treemap in action: [flekschas.github.io/treemap](https://flekschas.githu
    npm install && bower install
    ```
 
-3. Start local server
+3. Setup local test data
 
     **Test data**:
 
@@ -51,7 +51,7 @@ See the treemap in action: [flekschas.github.io/treemap](https://flekschas.githu
     Do the exact opposite as for **test data**. Make sure that Neo4J is running!
 
 
-## Start the app
+## Start local test service and run app
 
 ```
 gulp --open
