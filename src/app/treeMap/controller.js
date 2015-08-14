@@ -322,6 +322,12 @@ TreeMapCtrl.prototype.addEventListeners = function () {
        * this = the clicked DOM element
        * data = data
        */
+      var $this = $(this);
+
+      if ($this.parent().attr('class') === 'leaf-node') {
+        return;
+      }
+
       that.transition(this, this.__data__);
     }
   );
