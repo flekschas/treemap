@@ -61,20 +61,20 @@ function TreeMapCtrl ($element, $q, $, d3, neo4jD3, HEX, D3Colors, settings) {
   this.treeMap.$grandParent = this.$(this.treeMap.grandParent.node());
 
   /* ---------------------------- [START: STATIC] --------------------------- */
-  // this.d3.json('../data/cl.json', function(error, data) {
-  //   if (error) return console.warn(error);
-  //   this.data = data;
-  //   this.draw();
-  // }.bind(this));
+  this.d3.json('../data/cl.json', function(error, data) {
+    if (error) return console.warn(error);
+    this.data = data;
+    this.draw();
+  }.bind(this));
   /* ----------------------------- [END: STATIC] ---------------------------- */
 
   /* ----------------------------- [START: LIVE] ---------------------------- */
-  neo4jD3
-    .get()
-    .then(function (data) {
-      this.data = data;
-      this.draw();
-    }.bind(this));
+  // neo4jD3
+  //   .get()
+  //   .then(function (data) {
+  //     this.data = data;
+  //     this.draw();
+  //   }.bind(this));
   /* ------------------------------ [END: LIVE] ----------------------------- */
 }
 
@@ -670,10 +670,11 @@ TreeMapCtrl.prototype.layout = function (parent, depth) {
 /**
  * Set the coordinates of the rectangular.
  *
+ * @description
  * How to invoke:
  * `d3.selectAll('rect').call(this.rect.bind(this))`
  *
- * Note: This weird looking double this is needed as the context of a `call`
+ * Note: This weird looking double _this_ is needed as the context of a `call`
  * function is actually the same as the selection passed to it, which seems
  * redundant but that's how it works right now. So to assign `TreeMapCtrl` as
  * the context we have to manually bind `this`.
@@ -764,26 +765,48 @@ TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldLevel) {
 TreeMapCtrl.prototype.setBreadCrumb = function (node) {
   this.treeMap.grandParent.selectAll('li').remove();
 
-  var parent = node,
+  var parent = node.parent,
       that = this;
 
-  if (!node.parent) {
-    this.treeMap.grandParent
-      .append('li')
-        .attr('class', 'inactive')
-        .text(node.name);
-  } else {
-    parent = node.parent;
-    while (parent) {
-      this.treeMap.grandParent
-        .insert('li', 'li:first-child')
-          .append('a')
-            .datum(parent)
-            .text(parent.name);
+  // Add current root as an indecator where we are.
+  var current = this.treeMap.grandParent
+    .append('li')
+      .attr('class', 'current-root');
 
-      node = parent;
-      parent = node.parent;
+  if (parent) {
+    current
+      .append('svg')
+        .attr('class', 'icon-arrow-left is-mirrored')
+        .append('use')
+          .attr('xlink:href', 'assets/images/icons.svg#arrow-left');
+  }
+
+  current
+    .append('span')
+      .attr('class', 'text')
+      .text(node.name);
+
+  while (parent) {
+    var crumb = this.treeMap.grandParent
+      .insert('li', ':first-child')
+        .append('a')
+          .datum(parent);
+
+    if (parent.parent) {
+      crumb
+        .append('svg')
+          .attr('class', 'icon-arrow-left is-mirrored')
+          .append('use')
+            .attr('xlink:href', 'assets/images/icons.svg#arrow-left');
     }
+
+    crumb
+      .append('span')
+        .attr('class', 'text')
+        .text(parent.name);
+
+    node = parent;
+    parent = node.parent;
   }
 };
 
