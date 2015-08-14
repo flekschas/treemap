@@ -49,7 +49,8 @@ function TreeMapCtrl ($element, $q, $, d3, neo4jD3, HEX, D3Colors, settings) {
     .children(function(d, depth) { return depth ? null : d._children; })
     .sort(function(a, b) { return a.value - b.value; })
     .ratio(this.treeMap.height / this.treeMap.width * 0.5 * (1 + Math.sqrt(5)))
-    .round(false);
+    .round(false)
+    .ratio(1);
 
   this.treeMap.element = this.d3.select(this.$d3Element[0])
     .attr('viewBox', '0 0 ' + this.treeMap.width + ' ' + this.treeMap.height)
