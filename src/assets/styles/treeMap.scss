@@ -13,6 +13,35 @@
   float: left;
 }
 
+.floatbox {
+  clear: both;
+  overflow: hidden;
+
+  [class^='floatbox-'],
+  [class*=' floatbox-'] {
+    width: auto;
+  }
+
+  .floatbox-max-right {
+    width: auto;
+  }
+
+  [class^='floatbox-max-'],
+  [class*=' floatbox-max-'] {
+    overflow: hidden;
+  }
+
+  [class$='min-left'],
+  [class*='min-left '] {
+    float: left;
+  }
+
+  [class$='min-right'],
+  [class*='min-right '] {
+    float: right;
+  }
+}
+
 .treeMapWrapper .top-bar {
   position: relative;
   top: 0;
@@ -28,12 +57,17 @@
 }
 
 .treeMapWrapper .top-bar ul {
-  margin-left: 0.5em;
+  white-space: nowrap;
+
+  &.right {
+    text-align: right;
+  }
 
   li {
+    display: inline-block;
     position: relative;
     line-height: 3em;
-    margin-left: 0.25em;
+    max-width: 25%;
 
     &:first-child {
       margin-left: 0;
@@ -70,6 +104,7 @@
     line-height: 3em;
     padding: 0 0.25em;
     transition: all $transitionFast $easeInOutCubic;
+    cursor: pointer;
 
     &:hover {
       background: rgba(255, 247, 217, 0.5);
@@ -85,21 +120,39 @@
   }
 }
 
-.treeMapWrapper .top-bar > p {
-  margin: 0 0.5em;
+.treeMapWrapper .top-bar > div {
   line-height: 3em;
 }
 
-.treeMapWrapper .top-bar .left {
-  float: left;
+.treeMapWrapper .top-bar > .left {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 20%;
+  bottom: 0;
+  margin: 0 0.5em;
+  overflow: hidden;
 }
 
-.treeMapWrapper .top-bar .right {
-  float: right;
+.treeMapWrapper .top-bar > .right {
+  position: absolute;
+  top: 0;
+  left: 80%;
+  right: 0;
+  bottom: 0;
+  padding-left: 0.5em;
+  overflow: hidden;
 }
 
-.treeMapWrapper .top-bar a {
-  cursor: pointer;
+.treeMapWrapper .top-bar > .right:before {
+  position: absolute;
+  content: '';
+  dispplay: block;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  background: #dcdcdc;
 }
 
 .treeMapWrapper .top-bar input,
@@ -137,6 +190,7 @@
 
 .treeMapWrapper .top-bar input {
   height: 1em;
+  width: 100%;
   transition: all $transitionFast $easeInOutCubic;
 }
 

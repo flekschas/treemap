@@ -1,11 +1,19 @@
 <div class="treeMapWrapper">
   <div class="top-bar">
-    <ul id="back" class="left no-list-style horizontal-list">
-    </ul>
-    <p class="right">
-      <label for="f-visible-depth">Depth:</label>
-      <input id="f-visible-depth" type="number" ng-model="treeMap.visibleDepth">
-    </p>
+    <div class="left">
+      <ul id="back" class="left no-list-style">
+      </ul>
+    </div>
+    <div class="right floatbox">
+      <label for="f-visible-depth" class="floatbox-min-left">Depth:</label>
+      <div class="floatbox-max-right">
+        <input
+          class="floatbox-max-right"
+          id="f-visible-depth"
+          type="number"
+          ng-model="treeMap.visibleDepth">
+      </div>
+    </div>
   </div>
   <div class="treeMap">
     <svg class="d3"></svg>
