@@ -35,6 +35,7 @@
     "bower_components/angular-ui-router/release/angular-ui-router.js",
     "bower_components/d3/d3.js",
     "bower_components/lodash/lodash.js",
-    "bower_components/jquery/dist/jquery.js"
+    "bower_components/jquery/dist/jquery.js",
+    "bower_components/jquery-mousewheel/jquery.mousewheel.js"
   ]
 }

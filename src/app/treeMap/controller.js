@@ -24,7 +24,7 @@ function TreeMapCtrl ($element, $q, $, d3, neo4jD3, HEX, D3Colors, settings) {
   this.$d3Element = this.$element.find('.treeMap svg');
   this.settings = settings;
 
-  this._visibleDepth = 3;
+  this._visibleDepth = 1;
   this.currentLevel = 0;
 
   this.treeMap.width = this.$d3Element.width();
@@ -60,6 +60,7 @@ function TreeMapCtrl ($element, $q, $, d3, neo4jD3, HEX, D3Colors, settings) {
 
   this.treeMap.grandParent = this.d3.select('#back');
   this.treeMap.$grandParent = this.$(this.treeMap.grandParent.node());
+  this.treeMap.$grandParentContainer = this.treeMap.$grandParent.parent();
 
   /* ---------------------------- [START: STATIC] --------------------------- */
   this.d3.json('data/cl.json', function(error, data) {
@@ -88,9 +89,10 @@ function TreeMapCtrl ($element, $q, $, d3, neo4jD3, HEX, D3Colors, settings) {
 /**
  * Starter function for aggrgation and pruning.
  *
- * @method  addChildren
+ * @method  accumulateAndPrune
  * @author  Fritz Lekschas
- * @date    2015-08-04
+ * @date    2015-08-18
+ *
  * @param   {Object}  data        D3 data object.
  * @param   {String}  valueProp   Name of the property holding the value.
  */
@@ -113,9 +115,10 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
    * This function traverses all inner loops and stops one level BEFORE a leaf
    * to be able to splice (delete) empty leafs from the list of children
    *
-   * @method  addChildren
+   * @method  accumulateAndPruneChildren
    * @author  Fritz Lekschas
-   * @date    2015-08-04
+   * @date    2015-08-18
+   *
    * @param   {Object}   node         D3 data object of the node.
    * @param   {Number}   numChildren  Number of children of `node.
    * @param   {String}   valueProp    Property name of the propery holding the
@@ -214,10 +217,12 @@ TreeMapCtrl.prototype.accumulateAndPrune = function (data, valueProp) {
  *
  * @method  addChildren
  * @author  Fritz Lekschas
- * @date    2015-08-04
+ * @date    2015-08-18
+ *
  * @param   {Object}   parent     D3 selection of parent.
  * @param   {Object}   data       D3 data object of `parent`.
- * @param   {Number}   level      Current level of depth.
+ * @param   {Number}   level      Current level of depth relative to
+ *   `this.currentLevel`, i.e. level = 0 = this.currentLevel.
  * @param   {Boolean}  firstTime  When `true` triggers a set of initializing
  *   animation.
  * @return  {Object}              D3 selection of `parent`'s children.
@@ -235,7 +240,7 @@ TreeMapCtrl.prototype.addChildren = function (parent, data, level, firstTime) {
       .attr('class', 'group-of-nodes');
 
   // Recursion
-  if (level < this.currentLevel + this.visibleDepth) {
+  if (level < this.visibleDepth) {
     this.children[level + 1] = this.children[level + 1] || [];
     children.each(function (data) {
       if (data._children && data._children.length) {
@@ -406,26 +411,26 @@ TreeMapCtrl.prototype.addLabel = function (el, attr) {
 };
 
 /**
- * Add levels of children starting from level `level` until `this.numLevels`.
+ * Add levels of children starting from level `level` until `this.visibleDepth`.
  *
  * @method  addLevelsOfNodes
  * @author  Fritz Lekschas
- * @date    2015-08-03
- * @param   {Number}  oldLevel  Starting level.
+ * @date    2015-08-18
+ *
+ * @param   {Number}  oldVisibleDepth  Starting level.
  */
-TreeMapCtrl.prototype.addLevelsOfNodes = function (oldLevel) {
+TreeMapCtrl.prototype.addLevelsOfNodes = function (oldVisibleDepth) {
   var currentInnerNodes = this.d3.selectAll('.inner-node'),
     promises = [],
-    startLevel = this.currentLevel + oldLevel,
     that = this;
 
-  this.children[startLevel + 1] = this.children[startLevel + 1] || [];
-  for (var i = 0, len = this.children[startLevel].length; i < len; i++) {
-    this.children[startLevel][i].each(function (data) {
+  this.children[oldVisibleDepth + 1] = this.children[oldVisibleDepth + 1] || [];
+  for (var i = 0, len = this.children[oldVisibleDepth].length; i < len; i++) {
+    this.children[oldVisibleDepth][i].each(function (data) {
       if (data._children && data._children.length) {
         var children = that.addChildren(
-          that.d3.select(this), data, startLevel + 1);
-        that.children[startLevel + 1].push(children[0]);
+          that.d3.select(this), data, oldVisibleDepth + 1);
+        that.children[oldVisibleDepth + 1].push(children[0]);
         promises.push(children[1]);
       }
     });
@@ -440,22 +445,22 @@ TreeMapCtrl.prototype.addLevelsOfNodes = function (oldLevel) {
 };
 
 /**
- * Helper function that decides whether nodes have to be added or removed
+ * Helper function that decides whether nodes have to be added or removed.
  *
  * @method  adjustLevelDepth
  * @author  Fritz Lekschas
- * @date    2015-08-05
- * @param   {Number}  oldLevel  Former level of depth.
- * @param   {Number}  newLevel  New level of depth.
+ * @date    2015-08-18
+ *
+ * @param   {Number}  oldVisibleDepth  Former level of depth.
  */
-TreeMapCtrl.prototype.adjustLevelDepth = function (oldLevel, newLevel) {
+TreeMapCtrl.prototype.adjustLevelDepth = function (oldVisibleDepth) {
   var that = this;
 
-  if (oldLevel < newLevel) {
-    this.addLevelsOfNodes(oldLevel);
+  if (oldVisibleDepth < this.visibleDepth) {
+    this.addLevelsOfNodes(oldVisibleDepth);
   }
-  if (oldLevel > newLevel) {
-    this.removeLevelsOfNodes(oldLevel);
+  if (oldVisibleDepth > this.visibleDepth) {
+    this.removeLevelsOfNodes(oldVisibleDepth);
   }
 };
 
@@ -732,24 +737,24 @@ TreeMapCtrl.prototype.rect = function (elements, reduction) {
  * @method  removeLevelsOfNodes
  * @author  Fritz Lekschas
  * @date    2015-08-05
- * @param   {Number}  oldLevel  Former level of depth.
+ * @param   {Number}  oldVisibleDepth  Former level of depth.
  */
-TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldLevel) {
+TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldVisibleDepth) {
     var i,
       len,
       startLevel = this.currentLevel + this.visibleDepth,
       that = this;
 
     // Add inner nodes to `.group-of-nodes` at `startLevel`.
-    for (i = 0, len = this.children[startLevel].length; i < len; i++) {
-      this.children[startLevel][i].each(function (data) {
+    for (i = 0, len = this.children[this.visibleDepth].length; i < len; i++) {
+      this.children[this.visibleDepth][i].each(function (data) {
         that.fadeIn(that.addInnerNodes(that.d3.select(this)));
       });
     }
 
     // Remove all children deeper than what is specified.
-    for (i = 0, len = this.children[startLevel + 1].length; i < len; i++) {
-      var group = this.children[startLevel + 1][i].transition().duration(250);
+    for (i = 0, len = this.children[this.visibleDepth + 1].length; i < len; i++) {
+      var group = this.children[this.visibleDepth + 1][i].transition().duration(250);
 
       // Fade groups out and remove them
       group
@@ -757,7 +762,7 @@ TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldLevel) {
         .remove();
     }
     // Unset intemediate levels
-    for (i = startLevel + 1; i <= oldLevel; i++) {
+    for (i = this.visibleDepth + 1; i <= oldVisibleDepth; i++) {
       this.children[i] = undefined;
     }
 };
@@ -772,6 +777,9 @@ TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldLevel) {
  */
 TreeMapCtrl.prototype.setBreadCrumb = function (node) {
   this.treeMap.grandParent.selectAll('li').remove();
+  this.treeMap.breadCrumbWidth = 0;
+
+  var gp = $(this.treeMap.grandParent[0]);
 
   var parent = node.parent,
       that = this;
@@ -794,6 +802,8 @@ TreeMapCtrl.prototype.setBreadCrumb = function (node) {
       .attr('class', 'text')
       .text(node.name);
 
+  this.treeMap.breadCrumbWidth += $(current.node()).width();
+
   while (parent) {
     var crumb = this.treeMap.grandParent
       .insert('li', ':first-child')
@@ -813,8 +823,14 @@ TreeMapCtrl.prototype.setBreadCrumb = function (node) {
         .attr('class', 'text')
         .text(parent.name);
 
+    this.treeMap.breadCrumbWidth += $(crumb.node()).width();
+
     node = parent;
     parent = node.parent;
+  }
+
+  if (this.treeMap.breadCrumbWidth > this.treeMap.$grandParentContainer.width()) {
+
   }
 };
 
@@ -970,9 +986,9 @@ Object.defineProperty(
       return this._visibleDepth;
     },
     set: function (visibleDepth) {
-      var oldLevel = this._visibleDepth;
+      var oldVisibleDepth = this._visibleDepth;
       this._visibleDepth = Math.min(Math.max(1, visibleDepth), this.depth);
-      this.adjustLevelDepth(oldLevel, this.visibleDepth);
+      this.adjustLevelDepth(oldVisibleDepth);
     }
 });
 
