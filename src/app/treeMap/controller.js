@@ -777,7 +777,11 @@ TreeMapCtrl.prototype.removeLevelsOfNodes = function (oldVisibleDepth) {
  */
 TreeMapCtrl.prototype.setBreadCrumb = function (node) {
   this.treeMap.grandParent.selectAll('li').remove();
+  this.treeMap.$grandParent
+    .removeClass('right')
+    .removeAttr('style');
   this.treeMap.breadCrumbWidth = 0;
+  this.treeMap.breadCrumbContainerWidth = this.treeMap.breadCrumbContainerWidth || this.treeMap.$grandParentContainer.width();
 
   var gp = $(this.treeMap.grandParent[0]);
 
@@ -823,14 +827,20 @@ TreeMapCtrl.prototype.setBreadCrumb = function (node) {
         .attr('class', 'text')
         .text(parent.name);
 
-    this.treeMap.breadCrumbWidth += $(crumb.node()).width();
+    this.treeMap.breadCrumbWidth += $(crumb.node()).outerWidth();
+
+    if (this.treeMap.breadCrumbWidth > this.treeMap.breadCrumbContainerWidth) {
+      this.treeMap.$grandParent
+        .addClass('right')
+        .css('marginLeft', -this.treeMap.breadCrumbWidth);
+
+      $(crumb.node()).parent().html('&hellip;');
+
+      break;
+    }
 
     node = parent;
     parent = node.parent;
-  }
-
-  if (this.treeMap.breadCrumbWidth > this.treeMap.$grandParentContainer.width()) {
-
   }
 };
 

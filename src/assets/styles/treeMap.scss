@@ -57,12 +57,16 @@
 }
 
 .treeMapWrapper .top-bar ul {
-  margin-left: 0.5em;
+  white-space: nowrap;
+
+  &.right {
+    text-align: right;
+  }
 
   li {
+    display: inline-block;
     position: relative;
     line-height: 3em;
-    margin-left: 0.25em;
     max-width: 25%;
 
     &:first-child {
@@ -126,7 +130,7 @@
   left: 0;
   right: 20%;
   bottom: 0;
-  padding-right: 0.5em;
+  margin: 0 0.5em;
   overflow: hidden;
 }
 
@@ -140,7 +144,7 @@
   overflow: hidden;
 }
 
-.treeMapWrapper .top-bar .right:before {
+.treeMapWrapper .top-bar > .right:before {
   position: absolute;
   content: '';
   dispplay: block;
