@@ -319,6 +319,7 @@ TreeMapCtrl.prototype.addEventListeners = function () {
      */
     that.transition(this, this.__data__);
   });
+
   this.treeMap.$element.on(
     'click',
     '.label-wrapper, .outer-border',
@@ -337,6 +338,11 @@ TreeMapCtrl.prototype.addEventListeners = function () {
       that.transition(this, this.__data__);
     }
   );
+
+  this.treeMap.$element.on('mousewheel', function (e) {
+    e.preventDefault();
+    this.visibleDepth += e.deltaY > 0 ? 1 : -1;
+  }.bind(this));
 };
 
 /**
